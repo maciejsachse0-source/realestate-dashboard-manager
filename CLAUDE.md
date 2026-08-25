@@ -73,3 +73,7 @@ Plan budowy z etapami i definicjami ukończenia: `docs/plan-budowy-claude-code.m
 ## Stan projektu
 
 Aktualny etap i następne kroki: @docs/postep.md
+
+Zebrane pułapki i decyzje, które wyglądają na przeoczenie, a są zamierzone:
+`docs/pulapki.md`. Nie jest importowany celowo — przeczytaj go, kiedy dotykasz
+opisanego miejsca albo kiedy coś zachowuje się dziwnie.

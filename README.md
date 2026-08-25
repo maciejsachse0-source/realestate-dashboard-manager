@@ -6,13 +6,29 @@ i bez żadnych usług zewnętrznych.
 
 - Koncepcja i model danych: [`docs/system-najem-koncepcja.md`](docs/system-najem-koncepcja.md)
 - Plan budowy i etapy: [`docs/plan-budowy-claude-code.md`](docs/plan-budowy-claude-code.md)
-- Stan prac: [`docs/postep.md`](docs/postep.md)
-- Decyzje odbiegające od planu: [`docs/decyzje/`](docs/decyzje/)
+- Stan prac i co dalej: [`docs/postep.md`](docs/postep.md)
+- Pułapki i decyzje nie do cofnięcia: [`docs/pulapki.md`](docs/pulapki.md)
+- Odstępstwa od planu: [`docs/decyzje/`](docs/decyzje/)
 
-## Stan: etap E0 i E0.5 ukończone
+## Stan: etapy E0 – E5 ukończone
 
-Fundament stoi i działa od przeglądarki po bazę. Nie ma jeszcze żadnych ekranów
-ani danych — te przychodzą od etapu E1.
+Program działa od kliknięcia skrótu po dane. Można się zalogować, przeglądać
+lokale, filtrować je, wejść w profil lokalu i zobaczyć stan umowy na dowolny
+dzień wstecz oraz listę terminów wymagających uwagi.
+
+| Warstwa | Stan |
+|---|---|
+| Baza | 14 tabel, 16 ograniczeń CHECK, 3 migracje |
+| Reguły biznesowe | R1, R2, R4–R7, R9 — pokrycie testami 100% |
+| API | 38 endpointów, cztery role, audyt każdej zmiany |
+| Generator zdarzeń | codziennie o 6:00, idempotentny |
+| Interfejs | logowanie, dashboard, kokpit terminów, profil lokalu |
+
+Kontrola: 374 testy backendu, 8 frontendu, `mypy` strict i `ruff` czysto.
+
+**Czego jeszcze nie ma:** wprowadzania danych przez formularze, dokumentów,
+importu z Excela, ekranu waloryzacji i ekstrakcji z umów. Kolejność prac:
+[`docs/postep.md`](docs/postep.md).
 
 ## Uruchomienie dla użytkownika
 
@@ -27,6 +43,13 @@ klikając **`Zatrzymaj system.cmd`**.
 
 Pierwsze uruchomienie pobiera bazę danych (około 350 MB) i trwa kilka minut.
 Kolejne startują w kilka sekund.
+
+**Przy pierwszym starcie** program zakłada konto `administrator` i pokazuje
+losowe hasło **raz**, w oknie startowym. Zapisz je — komunikat nie wróci.
+Program poprosi o zmianę hasła przy pierwszym logowaniu.
+
+Adres to `127.0.0.1:8010`, a nie `localhost:8010`. Skrót otwiera go poprawnie;
+wpisanie `localhost` ręcznie może nie zadziałać (szczegóły w `docs/pulapki.md`).
 
 Skrót na pulpicie zakłada się raz:
 

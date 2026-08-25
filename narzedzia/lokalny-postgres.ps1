@@ -39,6 +39,8 @@ $Port  = 5434
 $Rola  = 'najem'
 $Haslo = 'najem'
 $Baza  = 'najem'
+#: Osobna baza dla testow. Testy nigdy nie dotykaja bazy z prawdziwymi umowami.
+$BazaTestowa = 'najem_testy'
 $HasloSuper = 'postgres-lokalnie'
 
 function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
@@ -143,12 +145,20 @@ function Zaloz-Role {
         Pisz "Utworzono role $Rola." 'Green'
     }
 
-    $bazaIstnieje = & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -tAc `
-        "SELECT 1 FROM pg_database WHERE datname = '$Baza'"
-    if ($bazaIstnieje -ne '1') {
-        & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -c `
-            "CREATE DATABASE $Baza OWNER $Rola ENCODING 'UTF8'" | Out-Null
-        Pisz "Utworzono baze $Baza." 'Green'
+    # Uprawnienie CREATEDB jest potrzebne, zeby testy mogly zalozyc sobie wlasna
+    # baze. Bez niego pytest pracowalby na tej samej bazie, co program, i kazdy
+    # przebieg mieszalby sie z prawdziwymi umowami.
+    & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -c `
+        "ALTER ROLE $Rola CREATEDB" | Out-Null
+
+    foreach ($nazwa in @($Baza, $BazaTestowa)) {
+        $bazaIstnieje = & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -tAc `
+            "SELECT 1 FROM pg_database WHERE datname = '$nazwa'"
+        if ($bazaIstnieje -ne '1') {
+            & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -c `
+                "CREATE DATABASE $nazwa OWNER $Rola ENCODING 'UTF8'" | Out-Null
+            Pisz "Utworzono baze $nazwa." 'Green'
+        }
     }
     Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 }
