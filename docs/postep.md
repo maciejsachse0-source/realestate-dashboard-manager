@@ -5,7 +5,7 @@ ten plik ładuje się do kontekstu przy każdej sesji.
 
 ## Gdzie jestem
 
-Etapy **E0, E0.5, E1, E2, E3 i E4** ukończone (25.08.2026). Fundament działa
+Etapy **E0 – E5** ukończone (25.08.2026), plus zaczątek E6. Fundament działa
 od przeglądarki po bazę, Claude Code skonfigurowany, schemat bazy postawiony:
 14 tabel, 16 ograniczeń CHECK, migracje `001_fundament` i `002_model_danych`.
 
@@ -16,21 +16,24 @@ API ma **38 endpointów**: uwierzytelnianie, kartoteka, dashboard, umowy,
 parametry, składniki, zabezpieczenia, przeglądy i kokpit terminów.
 Generator zdarzeń chodzi codziennie o 6:00 i jest idempotentny.
 
-**Nie ma jeszcze żadnego ekranu.** To jest E5.
+Interfejs działa: logowanie z wymuszoną zmianą hasła początkowego, dashboard
+z tabelą lokali i panelem filtrów, kokpit terminów, profil lokalu ze stanem
+na wybrany dzień. shadcn/ui na Radix, TanStack Query i Table.
 
 Przy pierwszym uruchomieniu program zakłada konto `administrator` i pokazuje
 losowe hasło raz, w oknie startowym.
 
 ## Co następne
 
-**E5: Dashboard.** Jedna bardzo dobra tabela (koncepcja, sekcja 7.1):
-TanStack Table z sortowaniem, filtrami, wyborem kolumn i wirtualizacją,
-panel filtrów, wyszukiwarka z debounce, pasek kompletności w wierszu,
-licznik alertów, eksport do XLSX, zapisane widoki, pełna obsługa z klawiatury.
+**E6: profil lokalu i kokpit terminów w pełnej wersji.** Dziś oba ekrany są
+w wersji podstawowej. Do dołożenia: zakładki profilu (Najemca, Finanse,
+Zabezpieczenia, Przeglądy, Dokumenty, Historia), oś czasu zmian parametrów,
+odraczanie i przypisywanie zdarzeń z interfejsu, formularze wprowadzania danych.
 
-Cztery stany każdego widoku projektujemy osobno: ładowanie, pusty, błąd, dane.
-API jest gotowe — `GET /api/v1/lokale` zwraca dokładnie to, czego tabela
-potrzebuje, razem z powodem braku daty zakończenia i listą brakujących pól.
+Z E5 świadomie zostały na później: eksport do XLSX, zapisane widoki, wybór
+kolumn, wirtualizacja i przełącznik tabela/kafelki. Żadne z nich nie jest
+warunkiem używania programu, a wirtualizacja wymaga migracji TanStack Table
+na natywne API v9 (ADR 006).
 
 ## Czego nadal nie wiem
 
@@ -86,3 +89,8 @@ potrzebuje, razem z powodem braku daty zakończenia i listą brakujących pól.
   logiem. Skrót hasła w logu audytu to ten sam sekret w drugiej tabeli.
 - Nowy parametr wchodzi jako `zaproponowana` także przy ręcznym wpisaniu.
   Decyzja D4 nie robi wyjątku dla człowieka piszącego z klawiatury.
+- Aplikacja nasłuchuje wyłącznie na `127.0.0.1`. Adres `localhost` w Chrome
+  potrafi rozwiązać się na `::1` i wtedy połączenia nie ma. Skrót otwiera
+  jawnie `http://127.0.0.1:8010` i tak ma zostać.
+- `vite.config.ts` używa `fileURLToPath`, nie `.pathname`. Na Windows
+  `.pathname` daje `/C:/dev/...`, czego bundler nie rozumie.
