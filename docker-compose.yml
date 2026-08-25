@@ -1,0 +1,38 @@
+# Wariant na przyszlosc. Sciezka glowna to "Uruchom system najmu.cmd" i przenosny
+# PostgreSQL w katalogu projektu (ADR 002). Ten plik istnieje po to, zeby przejscie
+# na Dockera nie wymagalo zmiany DATABASE_URL ani niczego w kodzie aplikacji.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: najem
+      POSTGRES_PASSWORD: najem
+      POSTGRES_DB: najem
+      # Provider ICU dla poprawnego sortowania polskich znakow.
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=pl-PL --locale=C --encoding=UTF8"
+    ports:
+      - "5434:5432"
+    volumes:
+      - dane-bazy:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U najem -d najem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://najem:najem@db:5432/najem
+      SRODOWISKO: dev
+    ports:
+      - "8010:8010"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./dane/dokumenty:/dane/dokumenty
+
+volumes:
+  dane-bazy:

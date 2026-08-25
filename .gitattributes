@@ -1,0 +1,13 @@
+# Normalizacja koncow linii. Bez tego kazdy commit sypie ostrzezeniami,
+# a skrypty Windows moga trafic do repo z LF i przestac dzialac.
+* text=auto eol=lf
+
+# Skrypty Windows musza miec CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.ico binary

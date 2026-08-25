@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+/* Polskie formatowanie i czytelnosc listy to podstawa tego interfejsu.
+   System designu przychodzi z shadcn/ui na etapie E5. */
+:root {
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  color-scheme: light dark;
+}
