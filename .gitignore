@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Srodowisko i sekrety
+.env
+.env.local
+.claude/settings.local.json
+
+# Lokalna baza i binaria PostgreSQL (pobierane skryptem, nie trzymane w repo)
+tools/
+pgdata/
+
+# Dokumenty uzytkownikow, nigdy do repo
+dane/dokumenty/
+dane/kopie/
+
+# System
+Thumbs.db
+desktop.ini
