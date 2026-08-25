@@ -25,6 +25,7 @@ export default function Uklad() {
           <nav className="flex items-center gap-1 text-sm">
             <Pozycja do="/">Lokale</Pozycja>
             <Pozycja do="/kartoteka">Kartoteka</Pozycja>
+            <Pozycja do="/import">Import</Pozycja>
             <Pozycja do="/terminy">
               Terminy
               {otwartych > 0 && (

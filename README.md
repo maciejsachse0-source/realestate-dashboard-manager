@@ -10,7 +10,7 @@ i bez żadnych usług zewnętrznych.
 - Pułapki i decyzje nie do cofnięcia: [`docs/pulapki.md`](docs/pulapki.md)
 - Odstępstwa od planu: [`docs/decyzje/`](docs/decyzje/)
 
-## Stan: etapy E0 – E6 ukończone
+## Stan: etapy E0 – E7 ukończone
 
 Program działa od kliknięcia skrótu po dane. Można się zalogować, przeglądać
 lokale, filtrować je, wejść w profil lokalu i zobaczyć stan umowy na dowolny
@@ -20,14 +20,15 @@ dzień wstecz oraz listę terminów wymagających uwagi.
 |---|---|
 | Baza | 14 tabel, 16 ograniczeń CHECK, 3 migracje |
 | Reguły biznesowe | R1, R2, R4–R7, R9 — pokrycie testami 100% |
-| API | 40 endpointów, cztery role, audyt każdej zmiany |
+| API | 46 endpointów, cztery role, audyt każdej zmiany |
 | Generator zdarzeń | codziennie o 6:00, idempotentny |
-| Interfejs | logowanie, dashboard, kartoteka, kokpit terminów, profil lokalu |
+| Interfejs | logowanie, dashboard, kartoteka, kokpit terminów, profil lokalu, import |
+| Dokumenty | typ rozpoznawany po zawartości, deduplikacja, hierarchia aneksów |
 
-Kontrola: 385 testów backendu, 8 frontendu, `mypy` strict i `ruff` czysto.
+Kontrola: 434 testy backendu, 8 frontendu, `mypy` strict i `ruff` czysto.
 
-**Czego jeszcze nie ma:** dokumentów, importu z Excela, ekranu waloryzacji
-i ekstrakcji z umów. Kolejność prac: [`docs/postep.md`](docs/postep.md).
+**Czego jeszcze nie ma:** ekranu waloryzacji rocznej i ekstrakcji danych
+z umów (OCR). Kolejność prac: [`docs/postep.md`](docs/postep.md).
 
 ## Uruchomienie dla użytkownika
 

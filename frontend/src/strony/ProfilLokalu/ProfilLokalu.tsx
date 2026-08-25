@@ -23,6 +23,7 @@ import { ZakladkaNajemca } from './ZakladkaNajemca'
 import { ZakladkaFinanse } from './ZakladkaFinanse'
 import { ZakladkaZabezpieczenia } from './ZakladkaZabezpieczenia'
 import { ZakladkaPrzeglady } from './ZakladkaPrzeglady'
+import { ZakladkaDokumenty } from './ZakladkaDokumenty'
 import { ZakladkaHistoria } from './ZakladkaHistoria'
 import { ZakladkaZdarzenia } from './ZakladkaZdarzenia'
 
@@ -154,6 +155,7 @@ export default function ProfilLokalu() {
           <TabsTrigger value="finanse">Finanse</TabsTrigger>
           <TabsTrigger value="zabezpieczenia">Zabezpieczenia</TabsTrigger>
           <TabsTrigger value="przeglady">Przeglądy</TabsTrigger>
+          <TabsTrigger value="dokumenty">Dokumenty</TabsTrigger>
           <TabsTrigger value="historia">Historia</TabsTrigger>
           <TabsTrigger value="zdarzenia">
             Zdarzenia
@@ -186,6 +188,10 @@ export default function ProfilLokalu() {
 
           <TabsContent value="przeglady">
             <ZakladkaPrzeglady lokalId={identyfikator} />
+          </TabsContent>
+
+          <TabsContent value="dokumenty">
+            <ZakladkaDokumenty okresId={okresId} />
           </TabsContent>
 
           <TabsContent value="historia">

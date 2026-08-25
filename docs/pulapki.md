@@ -103,6 +103,31 @@ Gdy bazy testowej nie ma, ostrzeżenie leci na stderr, a nie do nagłówka
 przebiegu — `addopts = "-q"` nagłówek tłumi. Ostrzeżenie, którego nikt nie
 zobaczy, jest gorsze niż jego brak: daje fałszywe poczucie, że testy przeszły.
 
+### Rozpoznawanie typu pliku
+`dokumenty/przechowalnia.py` sprawdza **pierwsze bajty**, nie rozszerzenie
+i nie nagłówek `Content-Type`. Oba są deklaracją nadawcy: `umowa.pdf` bywa
+plikiem wykonywalnym, a skan bez rozszerzenia bywa poprawnym PDF-em.
+
+DOCX i XLSX mają wspólną sygnaturę ZIP, więc rozróżnia je zawartość archiwum
+(`word/document.xml` kontra `xl/`). Zwykłe archiwum ZIP jest odrzucane.
+
+Nazwa pliku w przechowalni pochodzi ze skrótu treści, nigdy z uploadu.
+Nadawca nie ma wpływu na to, gdzie plik wyląduje.
+
+### Import z arkusza jest transakcyjny
+`uslugi/import_danych.py` sprawdza **wszystko** przed zapisaniem czegokolwiek
+i rzuca `ImportPrzerwany` przy pierwszym błędzie w arkuszu. Endpoint robi jawny
+`rollback()`. Import, który zapisuje trzydzieści wierszy i wywala się
+na trzydziestym pierwszym, zostawia bazę w stanie, którego nikt nie posprząta.
+
+Powtórzenie importu nie duplikuje: budynek, lokal i najemca są odnajdywani
+po naturalnych cechach, a umowa nie powstaje drugi raz dla lokalu, który już
+ją ma. Dzięki temu poprawiony arkusz można wgrać ponownie.
+
+Wartość czynszu z arkusza wchodzi jako **zatwierdzona**, a nie zaproponowana.
+To świadome odstępstwo od decyzji D4: arkusz wypełnia człowiek, a import
+uruchamia człowiek, który przed chwilą oglądał podgląd.
+
 ### `tests/domena/test_granice_warstw.py`
 Pilnuje, że `domena/` nie importuje SQLAlchemy, FastAPI ani niczego z I/O.
 Jeśli zacznie być niewygodny, to znak, że kod idzie w złą stronę, a nie test.

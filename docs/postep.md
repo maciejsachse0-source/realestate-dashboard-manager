@@ -6,34 +6,40 @@ Zebrane pułapki i decyzje nie do cofnięcia: [`docs/pulapki.md`](pulapki.md)
 
 ## Gdzie jestem
 
-Etapy **E0 – E6 ukończone** (25.08.2026). Program działa od kliknięcia skrótu po dane
+Etapy **E0 – E7 ukończone** (25.08.2026). Program działa od kliknięcia skrótu po dane
 i **da się w nim pracować**: wprowadzić budynek, lokal, najemcę, umowę, warunki,
 zabezpieczenia i przeglądy, zatwierdzić wartości, obsłużyć terminy.
 
-40 endpointów. Interfejs: logowanie, dashboard, kartoteka z formularzami,
-kokpit terminów z filtrami i akcjami, profil lokalu z siedmioma zakładkami.
+46 endpointów. Interfejs: logowanie, dashboard, kartoteka z formularzami,
+kokpit terminów z filtrami i akcjami, profil lokalu z ośmioma zakładkami,
+kreator importu z arkusza.
+
+Dokumenty: wgrywanie z rozpoznaniem typu po zawartości pliku, deduplikacja
+po SHA-256, hierarchia umowa → aneks, pobieranie ze śladem w audycie.
 
 Warstwa domenowa jest kompletna (reguły R1, R2, R4–R7, R9), pokrycie `domena/`
 wynosi 100%. Generator zdarzeń chodzi codziennie o 6:00 i jest idempotentny.
 Trzy migracje Alembica, jedna głowa.
 
-Kontrola na dziś: **385 testów backendu + 8 frontendu**, `mypy` strict i `ruff`
+Kontrola na dziś: **434 testy backendu + 8 frontendu**, `mypy` strict i `ruff`
 czysto, `npm run build` przechodzi.
 
 ## Co następne
 
-**E7: dokumenty i import z Excela.** Wgrywanie plików z walidacją typu MIME
-po zawartości, deduplikacja po SHA-256, hierarchia umowa → aneks, podgląd PDF.
-Import startowy z arkusza: kreator mapowania kolumn, walidacja przed zapisem,
-import transakcyjny.
+**E8: waloryzacja roczna.** Ekran z sekcji 7.6: panel wprowadzania wskaźnika,
+lista umów objętych waloryzacją z wyliczoną propozycją, umowy wyłączone
+z powodem wyłączenia, zbiorcze zatwierdzenie w jednej transakcji, zdarzenie
+„weksel do przeliczenia" po zatwierdzeniu.
 
-To pierwszy etap, w którym **naprawdę** potrzebna jest odpowiedź na punkt B
-(waluta), bo ktoś musi zadeklarować, czym są liczby w arkuszu.
+Reguła R2 jest gotowa i przetestowana od E2 — brakuje ekranu, endpointu
+i tabeli wskaźników (model `WskaznikWaloryzacji` istnieje od E1).
 
-Zostało na później z E5 i E6: eksport XLSX, zapisane widoki, wybór kolumn,
-wirtualizacja, edycja i usuwanie istniejących rekordów z interfejsu.
-Wirtualizacja wymaga wcześniej migracji TanStack Table na API v9
-([ADR 006](decyzje/006-tanstack-table-legacy.md)).
+Po E8 system zastępuje Excela. Wszystko dalej to poprawa efektywności,
+nie warunek działania.
+
+Zostało na później: podgląd PDF przez pdf.js (dziś plik otwiera się w karcie
+przeglądarki), eksport XLSX, zapisane widoki, wybór kolumn, wirtualizacja,
+edycja i usuwanie rekordów z interfejsu.
 
 ## Czego nadal nie wiem
 

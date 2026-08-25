@@ -6,6 +6,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useProfil } from '@/api/zapytania'
 import Uklad from '@/komponenty/Uklad'
 import Dashboard from '@/strony/Dashboard/Dashboard'
+import Import from '@/strony/Import/Import'
 import Kartoteka from '@/strony/Kartoteka/Kartoteka'
 import KokpitTerminow from '@/strony/KokpitTerminow/KokpitTerminow'
 import Logowanie from '@/strony/Logowanie/Logowanie'
@@ -47,6 +48,7 @@ function Aplikacja() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/terminy" element={<KokpitTerminow />} />
         <Route path="/kartoteka" element={<Kartoteka />} />
+        <Route path="/import" element={<Import />} />
         <Route path="/lokale/:lokalId" element={<ProfilLokalu />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
