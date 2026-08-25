@@ -31,7 +31,7 @@ KLUCZ_CZYNSZU = "czynsz_podstawowy"
 KLUCZ_POWIERZCHNI = "powierzchnia"
 
 
-def _na_wartosc_domenowa(wiersz: ParametrWartosc) -> WartoscParametru | None:
+def na_wartosc_domenowa(wiersz: ParametrWartosc) -> WartoscParametru | None:
     """Przepisuje wiersz na strukture domenowa. None, gdy wiersz jest niespojny.
 
     Niespojny wiersz pomijamy zamiast wywracac caly przebieg generatora:
@@ -71,7 +71,7 @@ def czynsz_na_dzien(okres: OkresNajmu, na_dzien: date) -> Kwota | None:
     """Czynsz obowiazujacy danego dnia albo None, gdy nieustalony."""
     wartosci = [
         w
-        for w in (_na_wartosc_domenowa(p) for p in okres.parametry if p.usunieto_dnia is None)
+        for w in (na_wartosc_domenowa(p) for p in okres.parametry if p.usunieto_dnia is None)
         if w is not None
     ]
     stan = stan_efektywny(wartosci, na_dzien)
@@ -79,11 +79,11 @@ def czynsz_na_dzien(okres: OkresNajmu, na_dzien: date) -> Kwota | None:
     return pozycja.kwota if pozycja is not None else None
 
 
-def _wypelnione_pola(okres: OkresNajmu, na_dzien: date, koniec: date | None) -> set[str]:
+def wypelnione_pola(okres: OkresNajmu, na_dzien: date, koniec: date | None) -> set[str]:
     """Ktore z pol krytycznych reguly R9 sa wypelnione i zatwierdzone."""
     wartosci = [
         w
-        for w in (_na_wartosc_domenowa(p) for p in okres.parametry if p.usunieto_dnia is None)
+        for w in (na_wartosc_domenowa(p) for p in okres.parametry if p.usunieto_dnia is None)
         if w is not None
     ]
     stan = stan_efektywny(wartosci, na_dzien)
@@ -113,7 +113,7 @@ def _wypelnione_pola(okres: OkresNajmu, na_dzien: date, koniec: date | None) -> 
     return wypelnione
 
 
-def _zabezpieczenie_domenowe(zab: Zabezpieczenie) -> StanZabezpieczenia:
+def zabezpieczenie_domenowe(zab: Zabezpieczenie) -> StanZabezpieczenia:
     wymagana: Kwota | None = None
     if (
         zab.wymagana_wartosc is not None
@@ -163,7 +163,7 @@ def zbuduj_stan_umowy(
         okres_wypowiedzenia_miesiace=okres.okres_wypowiedzenia_miesiace,
     ).wartosc
 
-    wypelnione = _wypelnione_pola(okres, na_dzien, koniec)
+    wypelnione = wypelnione_pola(okres, na_dzien, koniec)
     ocena = ocen_kompletnosc(wypelnione, POLA_KRYTYCZNE)
 
     przeglady = sesja.scalars(
@@ -188,7 +188,7 @@ def zbuduj_stan_umowy(
         profil_kompletny=ocena.kompletny,
         brakujace_pola=tuple(sorted(ocena.brakujace)),
         zabezpieczenia=tuple(
-            _zabezpieczenie_domenowe(z) for z in okres.zabezpieczenia if z.usunieto_dnia is None
+            zabezpieczenie_domenowe(z) for z in okres.zabezpieczenia if z.usunieto_dnia is None
         ),
         przeglady=tuple(
             StanPrzegladu(

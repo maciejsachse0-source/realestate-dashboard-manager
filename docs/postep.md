@@ -5,28 +5,32 @@ ten plik ładuje się do kontekstu przy każdej sesji.
 
 ## Gdzie jestem
 
-Etapy **E0, E0.5, E1, E2 i E3** ukończone (25.08.2026). Fundament działa
+Etapy **E0, E0.5, E1, E2, E3 i E4** ukończone (25.08.2026). Fundament działa
 od przeglądarki po bazę, Claude Code skonfigurowany, schemat bazy postawiony:
 14 tabel, 16 ograniczeń CHECK, migracje `001_fundament` i `002_model_danych`.
 
 Warstwa domenowa jest kompletna: słowniki, maszyny stanów, `pieniadze.py`,
 `kalendarz.py`, `parametry.py` (stan efektywny) oraz reguły R1, R2, R4–R7 i R9
 w `domena/reguly/`. Pokrycie `domena/` wynosi 100%. Zero danych, zero endpointów
-poza `/api/v1/health` i `/api/v1/zdarzenia/generuj`, zero ekranów.
+API ma **38 endpointów**: uwierzytelnianie, kartoteka, dashboard, umowy,
+parametry, składniki, zabezpieczenia, przeglądy i kokpit terminów.
+Generator zdarzeń chodzi codziennie o 6:00 i jest idempotentny.
 
-Generator zdarzeń działa: pokrywa katalog z sekcji 6, chodzi codziennie o 6:00
-przez APScheduler i jest idempotentny — sprawdzone na żywej bazie.
+**Nie ma jeszcze żadnego ekranu.** To jest E5.
+
+Przy pierwszym uruchomieniu program zakłada konto `administrator` i pokazuje
+losowe hasło raz, w oknie startowym.
 
 ## Co następne
 
-**E4: API i uwierzytelnianie.** Argon2id, sesje w ciasteczkach HttpOnly,
-cztery role z sekcji 7.9, blokada konta po 5 nieudanych próbach, wymuszona
-zmiana hasła przy pierwszym logowaniu. CRUD wszystkich encji, lista lokali
-z filtrowaniem i paginacją, `GET /lokale/{id}/stan?na_dzien=`, obsługa zdarzeń,
-audyt każdej zmiany i konflikt wersji jako 409.
+**E5: Dashboard.** Jedna bardzo dobra tabela (koncepcja, sekcja 7.1):
+TanStack Table z sortowaniem, filtrami, wyborem kolumn i wirtualizacją,
+panel filtrów, wyszukiwarka z debounce, pasek kompletności w wierszu,
+licznik alertów, eksport do XLSX, zapisane widoki, pełna obsługa z klawiatury.
 
-Warstwa domenowa jest gotowa i przetestowana, więc API ma być cienkie:
-tłumaczy HTTP na wywołania usług i z powrotem, bez logiki biznesowej.
+Cztery stany każdego widoku projektujemy osobno: ładowanie, pusty, błąd, dane.
+API jest gotowe — `GET /api/v1/lokale` zwraca dokładnie to, czego tabela
+potrzebuje, razem z powodem braku daty zakończenia i listą brakujących pól.
 
 ## Czego nadal nie wiem
 
@@ -75,3 +79,10 @@ tłumaczy HTTP na wywołania usług i z powrotem, bez logiki biznesowej.
   w listę duplikatów rosnącą o jeden wpis dziennie.
 - Stany trwałe (niekompletny profil, polisa poniżej kwoty) kotwiczą się na
   pierwszym dniu miesiąca, więc przypomnienie wraca raz w miesiącu.
+- Optimistic locking działa tylko dlatego, że `PUT` wymaga pola `wersja`
+  w treści żądania. Bez niego serwer wczytuje rekord świeżo i nigdy nie zauważa,
+  że ktoś zmienił go w międzyczasie.
+- `POLA_UTAJNIONE` w `uslugi/audyt.py` trzyma `hash_hasla` i `token_hash` poza
+  logiem. Skrót hasła w logu audytu to ten sam sekret w drugiej tabeli.
+- Nowy parametr wchodzi jako `zaproponowana` także przy ręcznym wpisaniu.
+  Decyzja D4 nie robi wyjątku dla człowieka piszącego z klawiatury.
