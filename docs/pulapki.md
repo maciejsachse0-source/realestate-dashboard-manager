@@ -93,8 +93,15 @@ dane — asercja „lista jest pusta" psuje się od pierwszego wprowadzonego lok
 Zdarzyło się to raz, po wgraniu danych przykładowych: 6 testów nie przeszło,
 58 wywaliło się na naruszeniu unikalności.
 
-Nagłówek przebiegu pytest mówi, na jakiej bazie pracuje. Jeśli pokazuje
-ostrzeżenie zamiast nazwy bazy — testy integracyjne są pomijane, nie zielone.
+**Przełączenie adresu bazy dzieje się przy imporcie `tests/conftest.py`,
+nie w `pytest_configure`.** Pytest najpierw importuje pliki conftest, a dopiero
+potem woła hak. Conftest w `tests/api/` importuje `najem.baza`, który tworzy
+silnik z adresu odczytanego w tym momencie. Gdy przełączenie siedziało w haku,
+`pytest tests/api/...` pracowało na prawdziwej bazie i nikt tego nie widział.
+
+Gdy bazy testowej nie ma, ostrzeżenie leci na stderr, a nie do nagłówka
+przebiegu — `addopts = "-q"` nagłówek tłumi. Ostrzeżenie, którego nikt nie
+zobaczy, jest gorsze niż jego brak: daje fałszywe poczucie, że testy przeszły.
 
 ### `tests/domena/test_granice_warstw.py`
 Pilnuje, że `domena/` nie importuje SQLAlchemy, FastAPI ani niczego z I/O.

@@ -235,6 +235,10 @@ class ZabezpieczenieWejscie(BaseModel):
         return self
 
 
+class ZabezpieczenieZmiana(ZabezpieczenieWejscie):
+    wersja: int = Field(ge=1)
+
+
 class ZabezpieczenieWyjscie(Odczyt):
     id: int
     okres_najmu_id: int

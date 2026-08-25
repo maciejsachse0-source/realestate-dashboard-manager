@@ -6,6 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from najem.domena.slowniki import (
+    RolaUzytkownika,
     StatusLokalu,
     StatusOkresuNajmu,
     TypLokalu,
@@ -155,6 +156,14 @@ class NajemcaWyjscie(Odczyt):
     osoba_fizyczna: bool
     notatki: str | None
     wersja: int
+
+
+class UzytkownikNaLiscie(Odczyt):
+    """Minimum potrzebne do wyboru osoby na liście. Nic ponad to."""
+
+    id: int
+    imie_nazwisko: str
+    rola: RolaUzytkownika
 
 
 # ------------------------------------------------------------ stan na dzien

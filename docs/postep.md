@@ -6,27 +6,33 @@ Zebrane pułapki i decyzje nie do cofnięcia: [`docs/pulapki.md`](pulapki.md)
 
 ## Gdzie jestem
 
-Etapy **E0 – E5 ukończone** (25.08.2026). Program działa od kliknięcia skrótu
-po dane: portable PostgreSQL, 38 endpointów, interfejs z logowaniem, dashboard,
-kokpit terminów i profil lokalu.
+Etapy **E0 – E6 ukończone** (25.08.2026). Program działa od kliknięcia skrótu po dane
+i **da się w nim pracować**: wprowadzić budynek, lokal, najemcę, umowę, warunki,
+zabezpieczenia i przeglądy, zatwierdzić wartości, obsłużyć terminy.
+
+40 endpointów. Interfejs: logowanie, dashboard, kartoteka z formularzami,
+kokpit terminów z filtrami i akcjami, profil lokalu z siedmioma zakładkami.
 
 Warstwa domenowa jest kompletna (reguły R1, R2, R4–R7, R9), pokrycie `domena/`
 wynosi 100%. Generator zdarzeń chodzi codziennie o 6:00 i jest idempotentny.
 Trzy migracje Alembica, jedna głowa.
 
-Kontrola na dziś: **374 testy backendu + 8 frontendu**, `mypy` strict i `ruff`
+Kontrola na dziś: **385 testów backendu + 8 frontendu**, `mypy` strict i `ruff`
 czysto, `npm run build` przechodzi.
 
 ## Co następne
 
-**E6: profil lokalu i kokpit terminów w pełnej wersji.** Oba ekrany są dziś
-podstawowe. Do dołożenia: zakładki profilu (Najemca, Finanse, Zabezpieczenia,
-Przeglądy, Historia), oś czasu zmian parametrów, odraczanie i przypisywanie
-zdarzeń z interfejsu, formularze wprowadzania danych.
+**E7: dokumenty i import z Excela.** Wgrywanie plików z walidacją typu MIME
+po zawartości, deduplikacja po SHA-256, hierarchia umowa → aneks, podgląd PDF.
+Import startowy z arkusza: kreator mapowania kolumn, walidacja przed zapisem,
+import transakcyjny.
 
-Z E5 świadomie zostały: eksport XLSX, zapisane widoki, wybór kolumn,
-wirtualizacja, przełącznik tabela/kafelki. Żadne nie jest warunkiem używania
-programu; wirtualizacja wymaga wcześniej migracji TanStack Table na API v9
+To pierwszy etap, w którym **naprawdę** potrzebna jest odpowiedź na punkt B
+(waluta), bo ktoś musi zadeklarować, czym są liczby w arkuszu.
+
+Zostało na później z E5 i E6: eksport XLSX, zapisane widoki, wybór kolumn,
+wirtualizacja, edycja i usuwanie istniejących rekordów z interfejsu.
+Wirtualizacja wymaga wcześniej migracji TanStack Table na API v9
 ([ADR 006](decyzje/006-tanstack-table-legacy.md)).
 
 ## Czego nadal nie wiem

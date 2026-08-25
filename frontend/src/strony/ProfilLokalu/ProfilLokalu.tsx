@@ -1,200 +1,202 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 
-import { useStanLokalu, useZdarzenia } from '@/api/zapytania'
-import type { WartoscStanu } from '@/api/typy'
-import { BRAK_DANYCH, formatujDate, formatujKwote } from '@/funkcje/format'
-import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
-import { PasekKompletnosci } from '@/komponenty/PasekKompletnosci'
+import {
+  useBudynki,
+  useLokal,
+  useNajemca,
+  useOkresNajmu,
+  useStanLokalu,
+  useZdarzenia,
+} from '@/api/zapytania'
+import { formatujDate } from '@/funkcje/format'
 import { czytelnaNazwaPola } from '@/funkcje/nazwy'
+import { Blad, Ladowanie } from '@/komponenty/Stany'
+import { PasekKompletnosci } from '@/komponenty/PasekKompletnosci'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-/** Nazwy parametrów po polsku. Klucz techniczny nie jest dla użytkownika. */
-const NAZWY_PARAMETROW: Record<string, string> = {
-  czynsz_podstawowy: 'Czynsz podstawowy',
-  stawka_m2: 'Stawka za m²',
-  powierzchnia: 'Powierzchnia z umowy',
-  data_zakonczenia: 'Data zakończenia',
-  oplata_eksploatacyjna: 'Opłata eksploatacyjna',
-}
+import { ZakladkaPrzeglad } from './ZakladkaPrzeglad'
+import { ZakladkaNajemca } from './ZakladkaNajemca'
+import { ZakladkaFinanse } from './ZakladkaFinanse'
+import { ZakladkaZabezpieczenia } from './ZakladkaZabezpieczenia'
+import { ZakladkaPrzeglady } from './ZakladkaPrzeglady'
+import { ZakladkaHistoria } from './ZakladkaHistoria'
+import { ZakladkaZdarzenia } from './ZakladkaZdarzenia'
 
 /**
  * Profil lokalu (koncepcja, sekcja 7.2).
  *
- * Zasada twarda: każda wartość pochodząca z dokumentu jest klikalna i prowadzi
- * do źródła. Wartości niezatwierdzone są wyróżnione wizualnie (decyzja D4).
+ * Zakładka jest w adresie, więc link do konkretnej zakładki da się wysłać
+ * współpracownikowi, a przycisk „wstecz" w przeglądarce działa tak,
+ * jak użytkownik się spodziewa.
  *
- * Pole „stan na dzień" pozwala cofnąć się w czasie. To jest widoczna twarz
- * decyzji D2: historia zostaje nienaruszona, a aneks tylko dokłada wersję.
+ * Pole „stan na dzień" jest nad zakładkami, bo dotyczy ich wszystkich:
+ * to widoczna twarz decyzji D2. Aneks nie nadpisuje wartości, tylko dokłada
+ * wersję, więc każdy dzień w przeszłości ma swoją odpowiedź.
  */
 export default function ProfilLokalu() {
   const { lokalId } = useParams<{ lokalId: string }>()
+  const [parametry, setParametry] = useSearchParams()
   const [naDzien, setNaDzien] = useState('')
   const identyfikator = Number(lokalId)
 
+  const lokal = useLokal(identyfikator)
   const stan = useStanLokalu(identyfikator, naDzien || undefined)
-  const zdarzenia = useZdarzenia({ lokal_id: identyfikator, limit: 50 })
+  const budynki = useBudynki()
+  const okresId = stan.data?.okres_najmu_id ?? null
+  const okres = useOkresNajmu(okresId)
+  const najemca = useNajemca(okres.data?.najemca_id)
+  const zdarzenia = useZdarzenia({ lokal_id: identyfikator, limit: 100, status_zdarzenia: '' })
 
   if (Number.isNaN(identyfikator)) {
     return <Blad komunikat="Nieprawidłowy numer lokalu w adresie." />
   }
 
+  if (lokal.isPending || stan.isPending) {
+    return <Ladowanie wierszy={6} />
+  }
+
+  if (lokal.isError || stan.isError) {
+    const blad = lokal.error ?? stan.error
+    return (
+      <Blad
+        komunikat={blad instanceof Error ? blad.message : 'Nie udało się wczytać lokalu.'}
+        ponow={() => {
+          void lokal.refetch()
+          void stan.refetch()
+        }}
+      />
+    )
+  }
+
+  const budynek = budynki.data?.pozycje.find((b) => b.id === lokal.data?.budynek_id)
+  const otwartych = zdarzenia.data?.pozycje.filter((z) => z.status === 'otwarte').length ?? 0
+  const doWeryfikacji = stan.data ? stan.data.brakujace_pola.length : 0
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link to="/" className="text-sm text-muted-foreground underline underline-offset-4">
             ← Wróć do listy
           </Link>
-          <h1 className="mt-1 text-lg font-semibold">Profil lokalu</h1>
+          <h1 className="mt-1 flex items-center gap-3 text-lg font-semibold">
+            {lokal.data?.oznaczenie}
+            {budynek && (
+              <span className="text-sm font-normal text-muted-foreground">{budynek.nazwa}</span>
+            )}
+            {najemca.data && (
+              <span className="text-sm font-normal">· {najemca.data.nazwa_pelna}</span>
+            )}
+          </h1>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="na_dzien">Stan na dzień</Label>
-          <Input
-            id="na_dzien"
-            type="date"
-            className="w-44"
-            value={naDzien}
-            onChange={(e) => setNaDzien(e.target.value)}
-          />
+        <div className="flex items-end gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Kompletność</p>
+            <div className="mt-1">
+              <PasekKompletnosci
+                procent={stan.data?.kompletnosc_procent ?? null}
+                braki={stan.data?.brakujace_pola ?? []}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="na_dzien">Stan na dzień</Label>
+            <Input
+              id="na_dzien"
+              type="date"
+              className="w-40"
+              value={naDzien}
+              onChange={(e) => setNaDzien(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      {stan.isPending && <Ladowanie wierszy={4} />}
-
-      {stan.isError && (
-        <Blad
-          komunikat={stan.error instanceof Error ? stan.error.message : 'Nieznany błąd.'}
-          ponow={() => void stan.refetch()}
-        />
+      {naDzien && (
+        <p className="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          Oglądasz stan z dnia {formatujDate(naDzien)}, a nie stan bieżący.{' '}
+          <button
+            type="button"
+            className="underline underline-offset-4"
+            onClick={() => setNaDzien('')}
+          >
+            Wróć do dzisiaj
+          </button>
+        </p>
       )}
 
-      {stan.data && (
-        <>
-          <section className="rounded-lg border bg-background p-4">
-            <div className="flex flex-wrap items-center gap-6">
-              <div>
-                <p className="text-xs text-muted-foreground">Kompletność profilu</p>
-                <div className="mt-1">
-                  <PasekKompletnosci
-                    procent={stan.data.kompletnosc_procent}
-                    braki={stan.data.brakujace_pola}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-muted-foreground">Koniec umowy</p>
-                <p className="mt-1 text-sm">
-                  {stan.data.data_zakonczenia ? (
-                    formatujDate(stan.data.data_zakonczenia)
-                  ) : (
-                    <span className="text-amber-700">nieustalona</span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {stan.data.powod_braku_daty_zakonczenia && (
-              <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
-                {stan.data.powod_braku_daty_zakonczenia}
-              </p>
-            )}
-
-            {stan.data.brakujace_pola.length > 0 && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Do uzupełnienia:{' '}
-                {stan.data.brakujace_pola.map(czytelnaNazwaPola).join(', ')}
-              </p>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-sm font-medium">Warunki obowiązujące</h2>
-            {Object.keys(stan.data.parametry).length === 0 ? (
-              <Pusto
-                tytul="Brak zatwierdzonych warunków"
-                opis="Wartości niezatwierdzone nie wchodzą do stanu. Zatwierdź je na ekranie weryfikacji."
-              />
-            ) : (
-              <div className="divide-y rounded-lg border bg-background">
-                {Object.entries(stan.data.parametry).map(([klucz, wartosc]) => (
-                  <Parametr key={klucz} klucz={klucz} wartosc={wartosc} />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-sm font-medium">Zdarzenia</h2>
-            {zdarzenia.data && zdarzenia.data.pozycje.length === 0 ? (
-              <Pusto tytul="Brak zdarzeń" opis="Ten lokal nie ma otwartych terminów." />
-            ) : (
-              <ul className="divide-y rounded-lg border bg-background">
-                {zdarzenia.data?.pozycje.map((z) => (
-                  <li key={z.id} className="flex items-center gap-3 p-3 text-sm">
-                    <Badge variant={z.waga === 'krytyczne' ? 'destructive' : 'secondary'}>
-                      {z.waga}
-                    </Badge>
-                    <span className="flex-1">{z.tresc}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatujDate(z.data_zdarzenia)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
-      )}
-    </div>
-  )
-}
-
-function Parametr({ klucz, wartosc }: { klucz: string; wartosc: WartoscStanu }) {
-  const niezatwierdzona = wartosc.status_weryfikacji !== 'zatwierdzona'
-  const zrodlo = [
-    wartosc.zrodlo_strona ? `str. ${wartosc.zrodlo_strona}` : null,
-    wartosc.zrodlo_paragraf,
-  ]
-    .filter(Boolean)
-    .join(', ')
-
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 p-3">
-      <span className="w-56 text-sm text-muted-foreground">
-        {NAZWY_PARAMETROW[klucz] ?? czytelnaNazwaPola(klucz)}
-      </span>
-
-      <span className="text-sm font-medium tabular-nums">
-        {wartosc.typ === 'kwota'
-          ? formatujKwote(wartosc.wartosc, wartosc.waluta ?? 'PLN')
-          : wartosc.wartosc || BRAK_DANYCH}
-        {wartosc.rodzaj_kwoty && (
-          <span className="ml-1 text-xs font-normal text-muted-foreground">
-            {wartosc.rodzaj_kwoty}
-          </span>
-        )}
-      </span>
-
-      {niezatwierdzona && (
-        <Badge variant="outline" className="border-amber-400 text-amber-700">
-          {wartosc.status_weryfikacji}
-        </Badge>
+      {stan.data?.powod_braku_daty_zakonczenia && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {stan.data.powod_braku_daty_zakonczenia}
+        </p>
       )}
 
-      <span className="ml-auto text-xs text-muted-foreground">
-        od {formatujDate(wartosc.obowiazuje_od)}
-        {wartosc.dokument_zrodlowy_id && (
-          // Dokumenty wchodzą w etapie E7. Do tego czasu pokazujemy sam ślad,
-          // bo sama informacja „skąd ta liczba" jest już wartościowa.
-          <span className="ml-2">· dokument #{wartosc.dokument_zrodlowy_id}</span>
-        )}
-        {zrodlo && <span className="ml-1">({zrodlo})</span>}
-      </span>
+      {doWeryfikacji > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Do uzupełnienia:{' '}
+          {(stan.data?.brakujace_pola ?? []).map(czytelnaNazwaPola).join(', ')}
+        </p>
+      )}
+
+      <Tabs
+        value={parametry.get('zakladka') ?? 'przeglad'}
+        onValueChange={(wartosc) => setParametry({ zakladka: wartosc }, { replace: true })}
+      >
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="przeglad">Przegląd</TabsTrigger>
+          <TabsTrigger value="najemca">Najemca</TabsTrigger>
+          <TabsTrigger value="finanse">Finanse</TabsTrigger>
+          <TabsTrigger value="zabezpieczenia">Zabezpieczenia</TabsTrigger>
+          <TabsTrigger value="przeglady">Przeglądy</TabsTrigger>
+          <TabsTrigger value="historia">Historia</TabsTrigger>
+          <TabsTrigger value="zdarzenia">
+            Zdarzenia
+            {otwartych > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {otwartych}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <div className="mt-4">
+          <TabsContent value="przeglad">
+            {stan.data && lokal.data && (
+              <ZakladkaPrzeglad stan={stan.data} lokal={lokal.data} okres={okres.data ?? null} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="najemca">
+            <ZakladkaNajemca najemca={najemca.data ?? null} wczytywanie={najemca.isPending} />
+          </TabsContent>
+
+          <TabsContent value="finanse">
+            <ZakladkaFinanse okresId={okresId} stan={stan.data ?? null} />
+          </TabsContent>
+
+          <TabsContent value="zabezpieczenia">
+            <ZakladkaZabezpieczenia okresId={okresId} />
+          </TabsContent>
+
+          <TabsContent value="przeglady">
+            <ZakladkaPrzeglady lokalId={identyfikator} />
+          </TabsContent>
+
+          <TabsContent value="historia">
+            <ZakladkaHistoria okresId={okresId} />
+          </TabsContent>
+
+          <TabsContent value="zdarzenia">
+            <ZakladkaZdarzenia zdarzenia={zdarzenia.data?.pozycje ?? []} />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   )
 }

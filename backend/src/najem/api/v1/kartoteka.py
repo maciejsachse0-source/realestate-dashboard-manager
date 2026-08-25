@@ -12,10 +12,10 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import ColumnElement, func, or_, select
 
 from najem.auth.sesje import ZalogowanySesja
-from najem.auth.zaleznosci import Administrator, Podglad, Zarzadca
+from najem.auth.zaleznosci import Administrator, Operator, Podglad, Zarzadca
 from najem.baza import SesjaBazy
 from najem.domena.slowniki import OperacjaAudytu
-from najem.modele import Budynek, Lokal, Najemca
+from najem.modele import Budynek, Lokal, Najemca, Uzytkownik
 from najem.schematy.kartoteka import (
     BudynekWejscie,
     BudynekWyjscie,
@@ -26,6 +26,7 @@ from najem.schematy.kartoteka import (
     NajemcaWejscie,
     NajemcaWyjscie,
     NajemcaZmiana,
+    UzytkownikNaLiscie,
 )
 from najem.schematy.wspolne import LIMIT_DOMYSLNY, LIMIT_MAKSYMALNY, Strona
 from najem.uslugi.audyt import zapisz_zmiane
@@ -328,3 +329,24 @@ def _usun_miekko(baza: SesjaBazy, obiekt: object, kto: ZalogowanySesja, adres: s
         uzytkownik_id=kto.uzytkownik.id,
         adres_ip=adres,
     )
+
+
+# --------------------------------------------------------------- uzytkownicy
+
+
+@router.get(
+    "/uzytkownicy",
+    response_model=list[UzytkownikNaLiscie],
+    summary="Lista użytkowników do przypisywania zadań",
+)
+def lista_uzytkownikow(baza: SesjaBazy, _: Operator) -> list[UzytkownikNaLiscie]:
+    """Kto może dostać zdarzenie do obsługi.
+
+    Zwraca tylko imię, nazwisko i rolę. Bez adresu e-mail, bez daty ostatniego
+    logowania i bez niczego, co dotyczy bezpieczeństwa konta — to należy
+    do panelu administratora, a nie do listy wyboru w kokpicie terminów.
+    """
+    wiersze = baza.scalars(
+        select(Uzytkownik).where(Uzytkownik.aktywny.is_(True)).order_by(Uzytkownik.imie_nazwisko)
+    ).all()
+    return [UzytkownikNaLiscie.model_validate(u) for u in wiersze]

@@ -13,6 +13,7 @@ migracji. Nie trzeba jej zakładać ręcznie.
 """
 
 import os
+import sys
 from urllib.parse import urlparse, urlunparse
 
 import pytest
@@ -81,9 +82,22 @@ def _zaaplikuj_migracje() -> None:
     command.upgrade(konfiguracja, "head")
 
 
+#: Przełączenie dzieje się przy IMPORCIE tego pliku, a nie w `pytest_configure`.
+#:
+#: Powód jest konkretny i kosztował już jedno śledztwo: pytest najpierw importuje
+#: pliki conftest, a dopiero potem woła `pytest_configure`. Conftest w `tests/api/`
+#: importuje `najem.baza`, który tworzy silnik z adresu odczytanego w tym momencie.
+#: Gdyby przełączenie siedziało w haku, uruchomienie `pytest tests/api/...`
+#: pracowałoby na prawdziwej bazie i nikt by tego nie zauważył.
+#:
+#: Conftest rodzica jest importowany przed conftestem katalogu niżej, więc
+#: kod na poziomie modułu wyprzedza wszystko, co dotyka aplikacji.
+URL_TESTOWY = _przelacz_na_baze_testowa()
+
+
 def pytest_configure(config: pytest.Config) -> None:
-    """Hak pytesta wykonywany przed zebraniem testów, czyli przed ich importami."""
-    url = _przelacz_na_baze_testowa()
+    """Zakłada bazę testową i nakłada migracje. Adres jest już przełączony."""
+    url = URL_TESTOWY
     try:
         _zaloz_baze_jesli_brak(url)
         _zaaplikuj_migracje()
@@ -93,7 +107,19 @@ def pytest_configure(config: pytest.Config) -> None:
         # widoczny. Pierwsza wersja tego kodu połykała błąd po cichu i przez to
         # baza testowa nigdy nie powstała, a testy pracowały na prawdziwych
         # danych, nie mówiąc o tym ani słowa.
-        config.stash[BLAD_BAZY] = str(blad).splitlines()[0]
+        powod = str(blad).splitlines()[0]
+        config.stash[BLAD_BAZY] = powod
+        # Wypisujemy wprost na stderr, bo `addopts = "-q"` tłumi nagłówek
+        # przebiegu. Ostrzeżenie, którego nikt nie zobaczy, jest gorsze
+        # niż jego brak: daje fałszywe poczucie, że testy przeszły.
+        for wiersz in (
+            "",
+            f"UWAGA: baza testowa niedostępna ({powod}).",
+            "Testy integracyjne zostaną POMINIĘTE, a nie zaliczone.",
+            "Uruchom: powershell -File narzedzia/lokalny-postgres.ps1 setup",
+            "",
+        ):
+            print(wiersz, file=sys.stderr)
 
 
 def pytest_report_header(config: pytest.Config) -> list[str]:

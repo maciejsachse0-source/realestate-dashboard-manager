@@ -4,14 +4,23 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pobierz, wyslij } from './klient'
+import { pobierz, wyslij, zapisz } from './klient'
 import type {
   Budynek,
   FiltryLokali,
+  Lokal,
   LokalNaLiscie,
+  Najemca,
+  OkresNajmu,
+  Parametr,
   Profil,
+  Przeglad,
+  Skladnik,
   StanNaDzien,
+  StatusWeryfikacji,
   Strona,
+  UzytkownikNaLiscie,
+  Zabezpieczenie,
   Zdarzenie,
 } from './typy'
 
@@ -103,5 +112,228 @@ export function useObsluzZdarzenie() {
       void kolejka.invalidateQueries({ queryKey: ['zdarzenia'] })
       void kolejka.invalidateQueries({ queryKey: ['lokale'] })
     },
+  })
+}
+
+// ------------------------------------------------------- profil lokalu
+
+export function useLokal(lokalId: number) {
+  return useQuery({
+    queryKey: ['lokal', lokalId],
+    queryFn: () => pobierz<Lokal>(`/lokale/${lokalId}`),
+  })
+}
+
+export function useOkresNajmu(okresId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['okres', okresId],
+    queryFn: () => pobierz<OkresNajmu>(`/okresy-najmu/${okresId}`),
+    enabled: okresId != null,
+  })
+}
+
+export function useNajemca(najemcaId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['najemca', najemcaId],
+    queryFn: () => pobierz<Najemca>(`/najemcy/${najemcaId}`),
+    enabled: najemcaId != null,
+  })
+}
+
+/** Cała oś czasu parametrów, także wartości niezatwierdzone (zakładka Historia). */
+export function useHistoriaParametrow(okresId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['parametry', okresId],
+    queryFn: () => pobierz<Parametr[]>(`/okresy-najmu/${okresId}/parametry`),
+    enabled: okresId != null,
+  })
+}
+
+export function useSkladniki(okresId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['skladniki', okresId],
+    queryFn: () => pobierz<Skladnik[]>(`/okresy-najmu/${okresId}/skladniki`),
+    enabled: okresId != null,
+  })
+}
+
+export function useZabezpieczenia(okresId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['zabezpieczenia', okresId],
+    queryFn: () => pobierz<Zabezpieczenie[]>(`/okresy-najmu/${okresId}/zabezpieczenia`),
+    enabled: okresId != null,
+  })
+}
+
+export function usePrzeglady(lokalId: number) {
+  return useQuery({
+    queryKey: ['przeglady', lokalId],
+    queryFn: () => pobierz<Przeglad[]>(`/lokale/${lokalId}/przeglady`),
+  })
+}
+
+export function useUzytkownicy() {
+  return useQuery({
+    queryKey: ['uzytkownicy'],
+    queryFn: () => pobierz<UzytkownikNaLiscie[]>('/uzytkownicy'),
+    staleTime: 10 * 60 * 1000,
+  })
+}
+
+// ------------------------------------------------------------- zmiany
+
+/** Unieważnia wszystko, co dotyczy jednego lokalu. Po zmianie danych umowy
+ *  zmienia się i stan efektywny, i kompletność, i lista na dashboardzie. */
+function odswiezLokal(kolejka: ReturnType<typeof useQueryClient>) {
+  for (const klucz of ['stan', 'lokale', 'parametry', 'skladniki', 'zabezpieczenia', 'przeglady', 'okres']) {
+    void kolejka.invalidateQueries({ queryKey: [klucz] })
+  }
+}
+
+export function useDecyzjaOParametrze() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status, uwagi }: { id: number; status: StatusWeryfikacji; uwagi?: string }) =>
+      wyslij<Parametr>(`/parametry/${id}/decyzja`, { status, uwagi: uwagi ?? null }),
+    onSuccess: () => odswiezLokal(kolejka),
+  })
+}
+
+export function useDodajParametr() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ okresId, dane }: { okresId: number; dane: Record<string, unknown> }) =>
+      wyslij<Parametr>(`/okresy-najmu/${okresId}/parametry`, dane),
+    onSuccess: () => odswiezLokal(kolejka),
+  })
+}
+
+export function useZmienZabezpieczenie() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, dane }: { id: number; dane: Record<string, unknown> }) =>
+      zapisz<Zabezpieczenie>(`/zabezpieczenia/${id}`, dane),
+    onSuccess: () => odswiezLokal(kolejka),
+  })
+}
+
+export function useProtokolPrzegladu() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: string }) =>
+      wyslij<Przeglad>(`/przeglady/${id}/protokol?data_protokolu=${data}`),
+    onSuccess: () => odswiezLokal(kolejka),
+  })
+}
+
+// --------------------------------------------------------- kokpit terminow
+
+export function useOdroczZdarzenie() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, do_dnia, notatka }: { id: number; do_dnia: string; notatka?: string }) =>
+      wyslij(`/zdarzenia/${id}/odroczenie`, {
+        odroczone_do: do_dnia,
+        notatka: notatka ?? null,
+      }),
+    onSuccess: () => {
+      void kolejka.invalidateQueries({ queryKey: ['zdarzenia'] })
+      void kolejka.invalidateQueries({ queryKey: ['lokale'] })
+    },
+  })
+}
+
+export function usePrzypiszZdarzenie() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, uzytkownikId }: { id: number; uzytkownikId: number | null }) =>
+      wyslij(`/zdarzenia/${id}/przypisanie`, { uzytkownik_id: uzytkownikId }),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['zdarzenia'] }),
+  })
+}
+
+// ------------------------------------------------------ tworzenie i edycja
+
+export function useDodajBudynek() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: Record<string, unknown>) => wyslij<Budynek>('/budynki', dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['budynki'] }),
+  })
+}
+
+export function useDodajLokal() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: Record<string, unknown>) => wyslij<Lokal>('/lokale', dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['lokale'] }),
+  })
+}
+
+export function useZmienLokal() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, dane }: { id: number; dane: Record<string, unknown> }) =>
+      zapisz<Lokal>(`/lokale/${id}`, dane),
+    onSuccess: (_, { id }) => {
+      void kolejka.invalidateQueries({ queryKey: ['lokale'] })
+      void kolejka.invalidateQueries({ queryKey: ['lokal', id] })
+    },
+  })
+}
+
+export function useDodajNajemce() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: Record<string, unknown>) => wyslij<Najemca>('/najemcy', dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['najemcy'] }),
+  })
+}
+
+export function useNajemcy(szukaj?: string) {
+  return useQuery({
+    queryKey: ['najemcy', szukaj ?? ''],
+    queryFn: () => pobierz<Strona<Najemca>>('/najemcy', { limit: 500, szukaj }),
+  })
+}
+
+export function useDodajOkresNajmu() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: Record<string, unknown>) => wyslij<OkresNajmu>('/okresy-najmu', dane),
+    onSuccess: () => {
+      void kolejka.invalidateQueries({ queryKey: ['stan'] })
+      void kolejka.invalidateQueries({ queryKey: ['lokale'] })
+    },
+  })
+}
+
+export function useDodajSkladnik() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ okresId, dane }: { okresId: number; dane: Record<string, unknown> }) =>
+      wyslij<Skladnik>(`/okresy-najmu/${okresId}/skladniki`, dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['skladniki'] }),
+  })
+}
+
+export function useDodajZabezpieczenie() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: ({ okresId, dane }: { okresId: number; dane: Record<string, unknown> }) =>
+      wyslij<Zabezpieczenie>(`/okresy-najmu/${okresId}/zabezpieczenia`, dane),
+    onSuccess: () => {
+      void kolejka.invalidateQueries({ queryKey: ['zabezpieczenia'] })
+      void kolejka.invalidateQueries({ queryKey: ['stan'] })
+      void kolejka.invalidateQueries({ queryKey: ['lokale'] })
+    },
+  })
+}
+
+export function useDodajPrzeglad() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: Record<string, unknown>) => wyslij<Przeglad>('/przeglady', dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['przeglady'] }),
   })
 }

@@ -16,7 +16,11 @@ from najem.domena.kalendarz import dzien_miesiaca, przesun_na_dzien_roboczy
 from najem.domena.reguly.data_zakonczenia import data_zakonczenia
 from najem.domena.reguly.przeglady import nastepny_przeglad, status_przegladu
 from najem.domena.slowniki import OperacjaAudytu, StatusWeryfikacji
-from najem.domena.stany import PRZEJSCIA_OKRESU_NAJMU, sprawdz_przejscie
+from najem.domena.stany import (
+    PRZEJSCIA_OKRESU_NAJMU,
+    PRZEJSCIA_ZABEZPIECZENIA,
+    sprawdz_przejscie,
+)
 from najem.modele import (
     Lokal,
     Najemca,
@@ -39,6 +43,7 @@ from najem.schematy.umowy import (
     SkladnikWyjscie,
     ZabezpieczenieWejscie,
     ZabezpieczenieWyjscie,
+    ZabezpieczenieZmiana,
 )
 from najem.uslugi.audyt import zapisz_zmiane
 
@@ -470,3 +475,52 @@ def zarejestruj_protokol(
     )
     baza.commit()
     return PrzegladWyjscie.model_validate(przeglad)
+
+
+@router.put(
+    "/zabezpieczenia/{zabezpieczenie_id}",
+    response_model=ZabezpieczenieWyjscie,
+    summary="Zmienia zabezpieczenie",
+)
+def zmien_zabezpieczenie(
+    zabezpieczenie_id: int,
+    dane: ZabezpieczenieZmiana,
+    baza: SesjaBazy,
+    kto: Zarzadca,
+    request: Request,
+) -> ZabezpieczenieWyjscie:
+    """Odnotowanie wplaty kaucji albo dostarczenia polisy to codzienna praca,
+    a nie wyjatkowa operacja. Przejscie statusu sprawdza maszyna stanow z R4.
+    """
+    zabezpieczenie = baza.get(Zabezpieczenie, zabezpieczenie_id)
+    if zabezpieczenie is None or zabezpieczenie.usunieto_dnia is not None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"Zabezpieczenie o numerze {zabezpieczenie_id} nie istnieje.",
+        )
+    if zabezpieczenie.wersja != dane.wersja:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=(
+                f"Zabezpieczenie zostało w międzyczasie zmienione "
+                f"(twoja wersja: {dane.wersja}, aktualna: {zabezpieczenie.wersja}). "
+                "Odśwież widok i wprowadź zmiany ponownie."
+            ),
+            headers={"X-Wersja-Biezaca": str(zabezpieczenie.wersja)},
+        )
+
+    if dane.status is not zabezpieczenie.status:
+        sprawdz_przejscie(PRZEJSCIA_ZABEZPIECZENIA, zabezpieczenie.status, dane.status)
+
+    for pole, wartosc in dane.model_dump(exclude={"wersja"}).items():
+        setattr(zabezpieczenie, pole, wartosc)
+
+    zapisz_zmiane(
+        baza,
+        zabezpieczenie,
+        operacja=OperacjaAudytu.ZMIANA,
+        uzytkownik_id=kto.uzytkownik.id,
+        adres_ip=_adres(request),
+    )
+    baza.commit()
+    return ZabezpieczenieWyjscie.model_validate(zabezpieczenie)

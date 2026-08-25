@@ -139,3 +139,163 @@ export interface FiltryLokali {
   limit?: number
   offset?: number
 }
+
+export type RodzajZabezpieczenia = 'kaucja' | 'weksel' | 'gwarancja_bankowa' | 'polisa'
+
+export type StatusZabezpieczenia =
+  | 'wymagane'
+  | 'dostarczone'
+  | 'zwrocone'
+  | 'zatrzymane'
+  | 'brak'
+
+export type StatusPrzegladu = 'aktualny' | 'zbliza_sie' | 'przeterminowany' | 'nieustalony'
+
+export type TypWartosci = 'kwota' | 'liczba' | 'data' | 'flaga' | 'tekst'
+
+export type RodzajKwoty = 'netto' | 'brutto'
+
+export type BazaOkresuNajmu = 'data_zawarcia' | 'data_przekazania'
+
+export interface Lokal {
+  id: number
+  budynek_id: number
+  oznaczenie: string
+  typ: TypLokalu
+  status: StatusLokalu
+  kondygnacja: string | null
+  powierzchnia_ewidencyjna: string | null
+  uwagi: string | null
+  wersja: number
+}
+
+export interface Najemca {
+  id: number
+  nazwa_pelna: string
+  nip: string | null
+  regon: string | null
+  krs: string | null
+  adres_siedziby: string | null
+  adres_korespondencyjny: string | null
+  email: string | null
+  telefon: string | null
+  osoba_fizyczna: boolean
+  notatki: string | null
+  wersja: number
+}
+
+export interface OkresNajmu {
+  id: number
+  lokal_id: number
+  najemca_id: number
+  data_zawarcia: string | null
+  data_przekazania: string | null
+  bazuje_na_dacie: BazaOkresuNajmu
+  okres_zawarcia_miesiace: number | null
+  okres_wypowiedzenia_miesiace: number | null
+  data_zakonczenia_planowana: string | null
+  data_zakonczenia_faktyczna: string | null
+  status: StatusUmowy
+  waloryzacja_podlega: boolean
+  waloryzacja_miesiac: number | null
+  waloryzacja_rodzaj_wskaznika: string | null
+  waloryzacja_stala_stawka: string | null
+  waloryzacja_pierwsza_data: string | null
+  uwagi: string | null
+  wersja: number
+}
+
+/** Jedna wersja parametru w osi czasu. Także niezatwierdzona (decyzja D4). */
+export interface Parametr {
+  id: number
+  okres_najmu_id: number
+  klucz: string
+  typ_wartosci: TypWartosci
+  wartosc_kwota: string | null
+  wartosc_waluta: string | null
+  wartosc_rodzaj_kwoty: RodzajKwoty | null
+  wartosc_stawka_vat: string | null
+  wartosc_liczba: string | null
+  wartosc_data: string | null
+  wartosc_flaga: boolean | null
+  wartosc_tekst: string | null
+  obowiazuje_od: string
+  obowiazuje_do: string | null
+  dokument_zrodlowy_id: number | null
+  zrodlo_strona: number | null
+  zrodlo_paragraf: string | null
+  status_weryfikacji: StatusWeryfikacji
+  zatwierdzil_uzytkownik_id: number | null
+  zatwierdzono_dnia: string | null
+  uwagi: string | null
+  wersja: number
+}
+
+export interface Skladnik {
+  id: number
+  okres_najmu_id: number
+  nazwa: string
+  klucz_parametru: string
+  sposob_wyliczenia: string | null
+  dzien_platnosci_miesiaca: number | null
+  /** Termin przesunięty na dzień roboczy (reguła R3). */
+  dzien_platnosci_roboczy: string | null
+  okres_rozliczeniowy: string
+  czy_waloryzowany: boolean
+  uwagi: string | null
+  wersja: number
+}
+
+export interface Zabezpieczenie {
+  id: number
+  okres_najmu_id: number
+  rodzaj: RodzajZabezpieczenia
+  status: StatusZabezpieczenia
+  wymagana_wartosc: string | null
+  wymagana_waluta: string | null
+  wymagana_rodzaj_kwoty: RodzajKwoty | null
+  wymagana_stawka_vat: string | null
+  sposob_wyliczenia: string | null
+  data_wymagalnosci: string | null
+  data_dostarczenia: string | null
+  data_waznosci: string | null
+  data_zwrotu: string | null
+  miejsce_przechowywania: string | null
+  dokument_id: number | null
+  uwagi: string | null
+  wersja: number
+}
+
+export interface Przeglad {
+  id: number
+  lokal_id: number
+  okres_najmu_id: number | null
+  element: string
+  kto_obciazany: 'najemca' | 'wynajmujacy'
+  czestotliwosc_miesiace: number | null
+  ostatni_przeglad_data: string | null
+  nastepny_przeglad_data: string | null
+  status: StatusPrzegladu
+  protokol_dokument_id: number | null
+  uwagi: string | null
+  wersja: number
+}
+
+export interface UzytkownikNaLiscie {
+  id: number
+  imie_nazwisko: string
+  rola: RolaUzytkownika
+}
+
+/** Filtry kokpitu terminów (koncepcja, sekcja 7.3). */
+export interface FiltryZdarzen {
+  status_zdarzenia?: StatusZdarzenia | ''
+  waga?: WagaZdarzenia
+  typ?: string
+  lokal_id?: number
+  budynek_id?: number
+  przypisany_uzytkownik_id?: number
+  do_dnia?: string
+  limit?: number
+  offset?: number
+}
