@@ -9,6 +9,7 @@ from najem.api.v1 import (
     import_danych,
     kartoteka,
     umowy,
+    waloryzacja,
     zdarzenia,
     zdrowie,
 )
@@ -21,4 +22,5 @@ router.include_router(dashboard.router)
 router.include_router(umowy.router)
 router.include_router(dokumenty.router)
 router.include_router(import_danych.router)
+router.include_router(waloryzacja.router)
 router.include_router(zdarzenia.router)

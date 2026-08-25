@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { formatujDate, formatujKwote, formatujPowierzchnie } from './format'
+import {
+  formatujDate,
+  formatujKwote,
+  formatujPowierzchnie,
+  formatujProcent,
+  formatujRoznice,
+} from './format'
 
 describe('formatujKwote', () => {
   it('uzywa przecinka dziesietnego i spacji jako separatora tysiecy', () => {
@@ -41,5 +47,29 @@ describe('formatujDate', () => {
   it('brak daty to znak braku, nie pusty string', () => {
     expect(formatujDate(null)).toBe('—')
     expect(formatujDate(undefined)).toBe('—')
+  })
+})
+
+describe('formatujRoznice', () => {
+  it('dodaje plus przy wzroscie', () => {
+    expect(formatujRoznice('351.50').replace(/ | /g, ' ')).toBe('+351,50 zł')
+  })
+
+  it('przy deflacji zostawia sam minus, bez "+-"', () => {
+    expect(formatujRoznice('-250.00').replace(/ | /g, ' ')).toBe('-250,00 zł')
+  })
+
+  it('zera nie oznacza plusem', () => {
+    expect(formatujRoznice('0.00').replace(/ | /g, ' ')).toBe('0,00 zł')
+  })
+})
+
+describe('formatujProcent', () => {
+  it('uzywa przecinka dziesietnego', () => {
+    expect(formatujProcent('3.7')).toBe('3,70%')
+  })
+
+  it('zachowuje znak ujemny', () => {
+    expect(formatujProcent('-2.5')).toBe('-2,50%')
   })
 })

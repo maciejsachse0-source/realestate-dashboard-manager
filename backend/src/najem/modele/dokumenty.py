@@ -196,6 +196,21 @@ class ParametrWartosc(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
     )
     uwagi: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # --- slad po waloryzacji rocznej (regula R2) ---
+    #: Rok przebiegu waloryzacji, ktory utworzyl ten wiersz. NULL dla wszystkich
+    #: pozostalych zrodel: aneksu, wpisu recznego, importu, ekstrakcji.
+    #:
+    #: Bez tego znacznika waloryzacja rozpoznawalaby wlasny poprzedni przebieg
+    #: po samej dacie wejscia. Aneks wchodzacy 1 stycznia bylby wtedy nie do
+    #: odroznienia od waloryzacji, a niezatwierdzona propozycja czynszu w tym
+    #: dniu blokowalaby przebieg komunikatem, ze podwyzka juz byla.
+    waloryzacja_rok: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Wskaznik uzyty w tym przebiegu. Zapisany, a nie odtwarzany z pary kwot,
+    #: bo z pisma do najemcy musi wynikac ten sam procent, ktory zastosowano.
+    waloryzacja_wskaznik_procent: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+
     okres_najmu: Mapped["OkresNajmu"] = relationship(back_populates="parametry")
     dokument_zrodlowy: Mapped[Dokument | None] = relationship(back_populates="parametry")
 
@@ -228,6 +243,19 @@ class ParametrWartosc(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
             "typ_wartosci <> 'kwota' "
             "OR (wartosc_waluta IS NOT NULL AND wartosc_rodzaj_kwoty IS NOT NULL)",
             name="ck_parametr_kwota_pelna",
+        ),
+        # Rok waloryzacji bez wskaznika (albo odwrotnie) to slad niepelny,
+        # z ktorego nie da sie napisac pisma do najemcy.
+        CheckConstraint(
+            "(waloryzacja_rok IS NULL) = (waloryzacja_wskaznik_procent IS NULL)",
+            name="ck_parametr_waloryzacja_komplet",
+        ),
+        # Eksport i wykrywanie powtorzonego przebiegu pytaja zawsze o konkretny
+        # rok. Indeks czesciowy, bo znacznik ma tylko ulamek wierszy.
+        Index(
+            "ix_parametr_waloryzacja_rok",
+            "waloryzacja_rok",
+            postgresql_where=text("waloryzacja_rok IS NOT NULL"),
         ),
         # Kwoty netto nie da sie zbrutowac bez stawki VAT (plan, punkt A).
         CheckConstraint(

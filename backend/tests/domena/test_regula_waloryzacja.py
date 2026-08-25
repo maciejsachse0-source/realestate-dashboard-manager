@@ -1,13 +1,11 @@
-"""Regula R2: waloryzacja roczna, i R5: wielokrotnosc czynszu."""
+"""Regula R2: waloryzacja roczna."""
 
 from datetime import date
 from decimal import Decimal
 
 from najem.domena.pieniadze import Kwota
 from najem.domena.reguly.waloryzacja import (
-    czy_zabezpieczenie_wymaga_przeliczenia,
     propozycja_waloryzacji,
-    wartosc_z_wielokrotnosci,
     wskaznik_dla_umowy,
 )
 from najem.domena.slowniki import RodzajKwoty, RodzajWskaznika
@@ -196,68 +194,3 @@ class TestPropozycjaWaloryzacji:
             wskaznik_procent=Decimal("3.7"),
         )
         assert not wynik.ustalone
-
-
-class TestWielokrotnoscCzynszu:
-    def test_czterokrotnosc_czynszu(self) -> None:
-        """Regula R5: typowy zapis o wartosci weksla."""
-        wynik = wartosc_z_wielokrotnosci(czynsz_netto("12500.00"), Decimal("4"))
-        assert wynik.wymagaj().wartosc == Decimal("50000.00")
-
-    def test_krotnosc_ulamkowa(self) -> None:
-        wynik = wartosc_z_wielokrotnosci(czynsz_netto("1000.00"), Decimal("1.5"))
-        assert wynik.wymagaj().wartosc == Decimal("1500.00")
-
-    def test_brak_czynszu(self) -> None:
-        assert not wartosc_z_wielokrotnosci(None, Decimal("4")).ustalone
-
-    def test_brak_krotnosci(self) -> None:
-        assert not wartosc_z_wielokrotnosci(czynsz_netto("100.00"), None).ustalone
-
-    def test_krotnosc_niedodatnia(self) -> None:
-        assert not wartosc_z_wielokrotnosci(czynsz_netto("100.00"), Decimal("0")).ustalone
-
-
-class TestPrzeliczenieZabezpieczenia:
-    def test_po_waloryzacji_weksel_wymaga_przeliczenia(self) -> None:
-        """Zabezpieczenie po kilku latach przestaje pokrywac ekspozycje.
-
-        To typowe miejsce, o ktorym nikt nie pamieta, wiec system przypomina.
-        """
-        assert czy_zabezpieczenie_wymaga_przeliczenia(
-            wartosc_biezaca=czynsz_netto("50000.00"),
-            czynsz_po_waloryzacji=czynsz_netto("12962.50"),
-            krotnosc=Decimal("4"),
-        )
-
-    def test_zgodna_wartosc_nie_wymaga_przeliczenia(self) -> None:
-        assert not czy_zabezpieczenie_wymaga_przeliczenia(
-            wartosc_biezaca=czynsz_netto("51850.00"),
-            czynsz_po_waloryzacji=czynsz_netto("12962.50"),
-            krotnosc=Decimal("4"),
-        )
-
-    def test_brak_danych_nie_generuje_alarmu(self) -> None:
-        """Alarm bez pokrycia w danych uczy ludzi ignorowania alarmow."""
-        assert not czy_zabezpieczenie_wymaga_przeliczenia(
-            wartosc_biezaca=None,
-            czynsz_po_waloryzacji=czynsz_netto("12962.50"),
-            krotnosc=Decimal("4"),
-        )
-        assert not czy_zabezpieczenie_wymaga_przeliczenia(
-            wartosc_biezaca=czynsz_netto("50000.00"),
-            czynsz_po_waloryzacji=None,
-            krotnosc=Decimal("4"),
-        )
-        assert not czy_zabezpieczenie_wymaga_przeliczenia(
-            wartosc_biezaca=czynsz_netto("50000.00"),
-            czynsz_po_waloryzacji=czynsz_netto("12962.50"),
-            krotnosc=None,
-        )
-
-    def test_krotnosc_niepoprawna_nie_generuje_alarmu(self) -> None:
-        assert not czy_zabezpieczenie_wymaga_przeliczenia(
-            wartosc_biezaca=czynsz_netto("50000.00"),
-            czynsz_po_waloryzacji=czynsz_netto("12962.50"),
-            krotnosc=Decimal("-1"),
-        )

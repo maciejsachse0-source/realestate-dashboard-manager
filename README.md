@@ -10,25 +10,31 @@ i bez żadnych usług zewnętrznych.
 - Pułapki i decyzje nie do cofnięcia: [`docs/pulapki.md`](docs/pulapki.md)
 - Odstępstwa od planu: [`docs/decyzje/`](docs/decyzje/)
 
-## Stan: etapy E0 – E7 ukończone
+## Stan: etapy E0 – E8 ukończone
 
 Program działa od kliknięcia skrótu po dane. Można się zalogować, przeglądać
 lokale, filtrować je, wejść w profil lokalu i zobaczyć stan umowy na dowolny
 dzień wstecz oraz listę terminów wymagających uwagi.
 
+Waloryzacja roczna: wskaźnik wprowadza się **raz**, a system liczy propozycję
+dla każdej umowy, która mu podlega, pokazuje wyłączenia z powodem i zapisuje
+zatwierdzone zmiany w jednej transakcji. Dotąd była to praca na kilkanaście
+godzin raz do roku.
+
 | Warstwa | Stan |
 |---|---|
-| Baza | 14 tabel, 16 ograniczeń CHECK, 3 migracje |
+| Baza | 14 tabel, 17 ograniczeń CHECK, 4 migracje |
 | Reguły biznesowe | R1, R2, R4–R7, R9 — pokrycie testami 100% |
-| API | 46 endpointów, cztery role, audyt każdej zmiany |
+| API | 52 endpointy, cztery role, audyt każdej zmiany |
 | Generator zdarzeń | codziennie o 6:00, idempotentny |
-| Interfejs | logowanie, dashboard, kartoteka, kokpit terminów, profil lokalu, import |
+| Interfejs | logowanie, dashboard, kartoteka, kokpit terminów, profil lokalu, import, waloryzacja |
 | Dokumenty | typ rozpoznawany po zawartości, deduplikacja, hierarchia aneksów |
 
-Kontrola: 434 testy backendu, 8 frontendu, `mypy` strict i `ruff` czysto.
+Kontrola: 464 testy backendu, 25 frontendu, `mypy` strict i `ruff` czysto.
 
-**Czego jeszcze nie ma:** ekranu waloryzacji rocznej i ekstrakcji danych
-z umów (OCR). Kolejność prac: [`docs/postep.md`](docs/postep.md).
+**Od tego miejsca system zastępuje Excela.** Czego jeszcze nie ma: ekstrakcji
+danych z umów (OCR), podglądu PDF w aplikacji, edycji i usuwania rekordów
+z interfejsu. Kolejność prac: [`docs/postep.md`](docs/postep.md).
 
 ## Uruchomienie dla użytkownika
 

@@ -57,5 +57,30 @@ export function formatujDate(iso: string | null | undefined): string {
   return `${dzien}.${miesiac}.${rok}`
 }
 
+/**
+ * Kwota ze znakiem, np. "+351,50 zl" albo "-250,00 zl".
+ *
+ * Osobna funkcja, bo znak "+" doklejany w komponencie daje przy deflacji
+ * "+-250,00 zl". Wskaznik ujemny jest dopuszczalny, wiec ten przypadek
+ * nie jest teoretyczny.
+ */
+export function formatujRoznice(wartosc: string | number, waluta = 'PLN'): string {
+  const liczba = typeof wartosc === 'string' ? Number(wartosc) : wartosc
+  if (!Number.isFinite(liczba)) return BRAK_DANYCH
+  const tekst = formatujKwote(liczba, waluta)
+  return liczba > 0 ? `+${tekst}` : tekst
+}
+
+/** Procent, np. "3,70%". Wejscie to string z API (Decimal), nie number. */
+export function formatujProcent(wartosc: string | number): string {
+  const liczba = typeof wartosc === 'string' ? Number(wartosc) : wartosc
+  if (!Number.isFinite(liczba)) return BRAK_DANYCH
+  return `${new Intl.NumberFormat(LOCALE, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    ...GRUPOWANIE,
+  }).format(liczba)}%`
+}
+
 /** Brak danych to informacja, nie pusta komorka (koncepcja, decyzja D5). */
 export const BRAK_DANYCH = '—'

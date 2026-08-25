@@ -108,40 +108,10 @@ def propozycja_waloryzacji(
     )
 
 
-def wartosc_z_wielokrotnosci(czynsz: Kwota | None, krotnosc: Decimal | None) -> Wynik[Kwota]:
-    """Regula R5: wartosc zabezpieczenia wyrazona jako wielokrotnosc czynszu.
-
-    Uzywane tez po waloryzacji: jesli wartosc weksla jest wielokrotnoscia
-    czynszu, a czynsz sie zmienil, weksel przestaje pokrywac ekspozycje.
-    """
-    if czynsz is None:
-        return nieustalony("Czynsz jest nieustalony, więc nie da się wyliczyć wielokrotności.")
-    if krotnosc is None:
-        return nieustalony("Nie podano krotności czynszu.")
-    if krotnosc <= 0:
-        return nieustalony(f"Krotność musi być dodatnia, podano {krotnosc}.")
-
-    return ustalony(
-        czynsz.pomnoz(krotnosc),
-        f"{krotnosc} razy czynsz {czynsz.wartosc} {czynsz.waluta}.",
-    )
-
-
-def czy_zabezpieczenie_wymaga_przeliczenia(
-    *,
-    wartosc_biezaca: Kwota | None,
-    czynsz_po_waloryzacji: Kwota | None,
-    krotnosc: Decimal | None,
-) -> bool:
-    """Czy po waloryzacji zabezpieczenie przestalo pokrywac ekspozycje (R5).
-
-    Zwraca False, gdy czegokolwiek brakuje: brak danych nie jest podstawa
-    do wystawienia alertu, bo alarm bez pokrycia w danych uczy ludzi
-    ignorowania alarmow.
-    """
-    if wartosc_biezaca is None or czynsz_po_waloryzacji is None or krotnosc is None:
-        return False
-    wymagana = wartosc_z_wielokrotnosci(czynsz_po_waloryzacji, krotnosc)
-    if not wymagana.ustalone:
-        return False
-    return wymagana.wymagaj().wartosc != wartosc_biezaca.wartosc
+# Regula R5 w czesci liczbowej (wartosc zabezpieczenia jako wielokrotnosc
+# czynszu) nie ma tu implementacji celowo. Wymaga krotnosci jako liczby,
+# a `zabezpieczenie.sposob_wyliczenia` to wolny tekst: „czterokrotność
+# czynszu podstawowego". Dopoki nikt tego nie zamieni na liczbe — recznie
+# albo ekstrakcja w E9 — system moze tylko przypomniec czlowiekowi,
+# ze zabezpieczenie trzeba przeliczyc, i dokladnie to robi
+# `uslugi/waloryzacja.py`.

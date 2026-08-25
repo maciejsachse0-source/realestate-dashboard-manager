@@ -142,3 +142,98 @@ Zamierzone. Uzasadnienie: [ADR 004](decyzje/004-kwoty-poza-tabela-umowy.md).
 ### Waluta bez wartości domyślnej
 Zamierzone. Baza, która sama dopisuje `PLN`, zamienia brak danych w fakt.
 Uzasadnienie: [ADR 005](decyzje/005-waluta-bez-wartosci-domyslnej.md).
+
+### Waloryzacja: sumy osobno dla każdej waluty
+`PrzebiegWaloryzacji.podsumowanie()` zwraca listę po jednej pozycji na walutę,
+nie jedną liczbę. Dodanie umowy w EUR do umowy w PLN dałoby wartość, która
+wygląda na pieniądze i nie znaczy nic. Gdyby kiedyś wróciła pokusa uproszczenia
+tego do jednego pola — to jest powód, dla którego go nie ma.
+
+Sumę zaznaczonych propozycji liczy endpoint `POST /waloryzacja/podsumowanie`,
+także przy odznaczaniu pojedynczej umowy. Front mógłby to zsumować sam, ale
+regułą projektu jest, że nie liczy niczego na pieniądzach — w JS są tylko
+liczby zmiennoprzecinkowe.
+
+### Waloryzacja rozpoznaje własny przebieg po znaczniku, nie po dacie
+`parametr_wartosc.waloryzacja_rok` mówi, który przebieg utworzył dany wiersz.
+Rozpoznawanie po samej dacie wejścia myliło aneks z waloryzacją i pozwalało
+niezatwierdzonej propozycji zablokować przebieg. Uzasadnienie:
+[ADR 007](decyzje/007-znacznik-waloryzacji-na-parametrze.md).
+
+Konsekwencja przy czytaniu starych danych: wiersze sprzed migracji
+`004_slad_waloryzacji` nie mają znacznika, więc eksport zmian zatwierdzonych
+za tamte lata będzie pusty. To nie jest błąd, tylko brak informacji, której
+nikt nigdy nie zapisał.
+
+
+
+### Umowa poza terminem nie wchodzi do waloryzacji
+Przebieg pomija umowy, które kończą się przed dniem wejścia podwyżki i te,
+które zaczynają się po nim. Nie wystarczy filtr po statusie okresu najmu:
+status zmienia **człowiek**, a generator zdarzeń tylko wystawia alert
+„umowa wygasła". Umowa zakończona w czerwcu potrafi więc wisieć w bazie jako
+aktywna aż do momentu, gdy ktoś to poprawi. Bez tego filtru podwyżka trafiłaby
+do pisma dla byłego najemcy.
+
+### R5 w warstwie domenowej ma tylko część opisową
+`domena/reguly/waloryzacja.py` **nie liczy** wartości zabezpieczenia jako
+wielokrotności czynszu. Wymagałoby to krotności jako liczby, a model trzyma
+`zabezpieczenie.sposob_wyliczenia` jako wolny tekst („czterokrotność czynszu
+podstawowego"). Funkcje, które to liczyły, zostały usunięte razem z testami,
+bo nie były wołane z żadnego miejsca w aplikacji, a podbijały pokrycie
+`domena/` kodem, którego program nie uruchamia.
+
+Dziś system tylko przypomina człowiekowi, że zabezpieczenie trzeba przeliczyć
+— i nie robi tego przy wskaźniku 0%, bo wtedy czynsz się nie zmienił.
+Zamiana opisu słownego na liczbę to zadanie ekstrakcji (E9).
+
+### Format liczb w eksportach XLSX
+Sam `arkusz.append([...])` daje komórki bez formatu, więc Excel pokazuje
+`9851,5` zamiast `9 851,50`. Arkusze waloryzacji idą do pism dla najemców,
+więc kolumny kwotowe dostają `number_format = "# ##0.00"`, wskaźnik `"0.00"`
+(procent nie jest kwotą i nie dostaje separatora tysięcy), a data
+`"DD.MM.YYYY"`. Ten sam zabieg trzeba powtórzyć w każdym kolejnym eksporcie.
+
+Kwoty przekazujemy jako `Decimal`, nigdy przez `float()`. Sam plik XLSX nie ma
+typu dziesiętnego, więc odczyt i tak zwróci `float` — ale to jest ograniczenie
+formatu, a nie powód, żeby łamać zasadę po naszej stronie.
+
+### Propozycje i zatwierdzone zmiany w osobnych arkuszach
+Decyzja D4 mówi, że wartość niezatwierdzona nie wchodzi do raportów, a z arkusza
+waloryzacji ktoś robi korespondencję seryjną. Kolumna „Stan" w jednym arkuszu
+była za słabym rozróżnieniem: wystarczyło pobrać plik przed zatwierdzeniem,
+żeby najemca dostał pismo o podwyżce, której w systemie nie ma. Propozycje mają
+własną zakładkę „Propozycje niezatwierdzone", więc pomyłka wymaga przejścia
+na inny arkusz, a nie przeoczenia jednej kolumny.
+
+### Front nie dokleja znaku „+" do kwoty
+`formatujRoznice` z `format.ts` bierze znak z wartości. Sztywne `+${...}`
+przy wskaźniku ujemnym dawało „+-250,00 zł" na zielono, czyli obniżkę
+pokazaną jako podwyżkę. Wskaźnik ujemny jest dopuszczalny i po stronie API,
+i po stronie interfejsu, więc ten przypadek nie jest teoretyczny.
+
+### Pole roku trzymamy jako tekst, nie jako liczbę
+`Number('')` to `0`, a klient HTTP odsiewa tylko `undefined`, `null` i pusty
+tekst. Skasowanie zawartości pola przed wpisaniem innego roku wysyłało więc
+`?rok=0` i pokazywało użytkownikowi błąd 422 z Pydantica. Do zapytań idzie
+dopiero wartość z dozwolonego zakresu — to samo dotyczy każdego innego pola
+liczbowego sterującego zapytaniem.
+
+### `expire_on_commit=False` a odpowiedzi z POST
+Sesja nie odświeża obiektów po `commit()`, więc endpoint tworzący rekord odda
+to, co przyszło w żądaniu, a nie to, co jest w bazie. Przy `NUMERIC(5,2)`
+POST zwracał `"3.7"`, a GET `"3.70"` — ta sama wartość pokazywana na dwa
+sposoby. `dodaj_wskaznik` woła `baza.refresh()` po commicie. Warto o tym
+pamiętać przy każdym nowym endpointcie tworzącym rekord z kolumną o ustalonej
+precyzji albo z wartością nadawaną przez bazę.
+
+Osobna sprawa: sprawdzenie `SELECT`-em przed `INSERT`-em nie jest atomowe.
+Dwa równoległe żądania zatrzyma dopiero unikalny indeks, więc `IntegrityError`
+jest przechwytywany i mapowany na 409, a nie zostawiany jako 500.
+
+### Przebieg waloryzacji nie jest stronicowany
+Świadomie, wbrew regule „każdy endpoint listujący ma paginację". Waloryzacja
+jest operacją na całym portfelu naraz: użytkownik zaznacza i zatwierdza
+wszystko jednym ruchem. Strona po pięćdziesiąt umów zamieniłaby jeden rytuał
+raz do roku w dwadzieścia osobnych zatwierdzeń i ukryła część wyłączeń.
+`/waloryzacja/wskazniki` paginację ma, bo to zwykła lista.
