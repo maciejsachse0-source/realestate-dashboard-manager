@@ -1,5 +1,7 @@
 """Punkt wejscia aplikacji."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -7,6 +9,22 @@ from fastapi.staticfiles import StaticFiles
 
 from najem.api.v1 import router as router_v1
 from najem.config import KATALOG_REPO, ustawienia
+from najem.zadania.harmonogram import uruchom_harmonogram, zatrzymaj_harmonogram
+
+
+@asynccontextmanager
+async def cykl_zycia(_: FastAPI) -> AsyncIterator[None]:
+    """Harmonogram zyje tak dlugo, jak aplikacja.
+
+    Generator zdarzen jest idempotentny, wiec restart aplikacji w srodku dnia
+    niczego nie dubluje ani nie gubi.
+    """
+    uruchom_harmonogram()
+    try:
+        yield
+    finally:
+        zatrzymaj_harmonogram()
+
 
 app = FastAPI(
     title="System Zarzadzania Umowami Najmu",
@@ -14,6 +32,7 @@ app = FastAPI(
     description="Wewnetrzna aplikacja on-prem. Rejestr stanu umow najmu.",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+    lifespan=cykl_zycia,
 )
 
 app.include_router(router_v1)

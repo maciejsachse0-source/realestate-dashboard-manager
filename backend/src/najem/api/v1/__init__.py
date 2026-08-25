@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 
-from najem.api.v1 import zdrowie
+from najem.api.v1 import zdarzenia, zdrowie
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(zdrowie.router)
+router.include_router(zdarzenia.router)

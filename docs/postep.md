@@ -5,24 +5,28 @@ ten plik ładuje się do kontekstu przy każdej sesji.
 
 ## Gdzie jestem
 
-Etapy **E0, E0.5, E1 i cały E2** ukończone (25.08.2026). Fundament działa
+Etapy **E0, E0.5, E1, E2 i E3** ukończone (25.08.2026). Fundament działa
 od przeglądarki po bazę, Claude Code skonfigurowany, schemat bazy postawiony:
 14 tabel, 16 ograniczeń CHECK, migracje `001_fundament` i `002_model_danych`.
 
 Warstwa domenowa jest kompletna: słowniki, maszyny stanów, `pieniadze.py`,
 `kalendarz.py`, `parametry.py` (stan efektywny) oraz reguły R1, R2, R4–R7 i R9
 w `domena/reguly/`. Pokrycie `domena/` wynosi 100%. Zero danych, zero endpointów
-poza `/api/v1/health`, zero ekranów.
+poza `/api/v1/health` i `/api/v1/zdarzenia/generuj`, zero ekranów.
+
+Generator zdarzeń działa: pokrywa katalog z sekcji 6, chodzi codziennie o 6:00
+przez APScheduler i jest idempotentny — sprawdzone na żywej bazie.
 
 ## Co następne
 
-**E3: generator zdarzeń.** Katalog z sekcji 6 koncepcji, idempotentnie.
-Czysta funkcja `(stan_umowy, data_odniesienia) -> lista zdarzeń` w domenie,
-usługa zapisująca z `ON CONFLICT DO NOTHING`, zadanie APScheduler raz na dobę
-o 6:00 i endpoint administracyjny do ręcznego uruchomienia.
+**E4: API i uwierzytelnianie.** Argon2id, sesje w ciasteczkach HttpOnly,
+cztery role z sekcji 7.9, blokada konta po 5 nieudanych próbach, wymuszona
+zmiana hasła przy pierwszym logowaniu. CRUD wszystkich encji, lista lokali
+z filtrowaniem i paginacją, `GET /lokale/{id}/stan?na_dzien=`, obsługa zdarzeń,
+audyt każdej zmiany i konflikt wersji jako 409.
 
-Klucz naturalny `(typ, encja, data)` jest już unikalny w bazie od E1, więc
-idempotencja jest wymuszona po stronie danych, nie tylko w kodzie.
+Warstwa domenowa jest gotowa i przetestowana, więc API ma być cienkie:
+tłumaczy HTTP na wywołania usług i z powrotem, bez logiki biznesowej.
 
 ## Czego nadal nie wiem
 
@@ -66,3 +70,8 @@ idempotencja jest wymuszona po stronie danych, nie tylko w kodzie.
   przekraczałby próg użyteczności przez artefakt zaokrąglenia.
 - Funkcje sprawdzające w `reguly/zabezpieczenia.py` zwracają `False` przy braku
   danych. Alarm bez pokrycia w danych uczy ludzi ignorowania alarmów.
+- `ProponowaneZdarzenie.data_zdarzenia` to data, KTÓREJ zdarzenie DOTYCZY,
+  nigdy dzień uruchomienia generatora. Zmiana tego zamieni kokpit terminów
+  w listę duplikatów rosnącą o jeden wpis dziennie.
+- Stany trwałe (niekompletny profil, polisa poniżej kwoty) kotwiczą się na
+  pierwszym dniu miesiąca, więc przypomnienie wraca raz w miesiącu.
