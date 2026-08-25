@@ -38,7 +38,10 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "N", "RUF"]
-ignore = ["RUF001", "RUF002", "RUF003"]  # polskie znaki diakrytyczne w tekstach
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # polskie znaki diakrytyczne w tekstach
+    "N818",  # wyjatki domenowe maja nazwy polskie, sufiks "Error" bylby kalka
+]
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/versions/*" = ["E501"]
