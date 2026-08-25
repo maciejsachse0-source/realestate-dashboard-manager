@@ -164,3 +164,43 @@ class TestDzienMiesiaca:
             dzien_miesiaca(2026, 3, 0)
         with pytest.raises(ValueError, match="Dzień miesiąca"):
             dzien_miesiaca(2026, 3, 32)
+
+
+class TestDodawanieMiesiecy:
+    def test_typowy_przypadek(self) -> None:
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(date(2026, 2, 1), 24) == date(2028, 2, 1)
+
+    def test_przejscie_przez_koniec_roku(self) -> None:
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(date(2026, 11, 15), 3) == date(2027, 2, 15)
+
+    def test_31_stycznia_plus_miesiac_to_koniec_lutego(self) -> None:
+        """Umowa zawarta 31 stycznia nie moze konczyc sie 31 lutego."""
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(date(2026, 1, 31), 1) == date(2026, 2, 28)
+        assert dodaj_miesiace(date(2028, 1, 31), 1) == date(2028, 2, 29)
+
+    def test_31_sierpnia_plus_miesiac_to_30_wrzesnia(self) -> None:
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(date(2026, 8, 31), 1) == date(2026, 9, 30)
+
+    def test_zero_miesiecy_nic_nie_zmienia(self) -> None:
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(date(2026, 8, 25), 0) == date(2026, 8, 25)
+
+    def test_liczba_ujemna_cofa(self) -> None:
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(date(2026, 3, 15), -3) == date(2025, 12, 15)
+
+    def test_operacja_nie_jest_odwracalna_i_to_jest_zamierzone(self) -> None:
+        """Dlatego koniec umowy liczymy od daty poczatkowej, a nie krokami."""
+        from najem.domena.kalendarz import dodaj_miesiace
+
+        assert dodaj_miesiace(dodaj_miesiace(date(2026, 1, 31), 1), -1) == date(2026, 1, 28)

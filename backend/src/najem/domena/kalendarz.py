@@ -108,6 +108,24 @@ def dodaj_dni_robocze(dzien: date, ile: int) -> date:
     return biezacy
 
 
+def dodaj_miesiace(poczatek: date, ile: int) -> date:
+    """Data oddalona o podana liczbe miesiecy kalendarzowych.
+
+    Gdy dzien nie istnieje w miesiacu docelowym, wynikiem jest ostatni dzien
+    tego miesiaca: 31 stycznia plus miesiac to 28 albo 29 lutego. Umowa zawarta
+    31 sierpnia na szesc miesiecy nie moze konczyc sie 31 lutego.
+
+    Uwaga: operacja nie jest odwracalna. 31.01 plus miesiac minus miesiac daje
+    28.02 minus miesiac, czyli 28.01. Dlatego koniec umowy liczymy zawsze
+    od daty poczatkowej, a nie krokami.
+    """
+    numer_miesiaca = poczatek.month - 1 + ile
+    rok = poczatek.year + numer_miesiaca // 12
+    miesiac = numer_miesiaca % 12 + 1
+    ostatni = calendar.monthrange(rok, miesiac)[1]
+    return date(rok, miesiac, min(poczatek.day, ostatni))
+
+
 def dzien_miesiaca(rok: int, miesiac: int, dzien: int) -> date:
     """Konkretna data dla terminu typu "do 10-go dnia miesiaca".
 
