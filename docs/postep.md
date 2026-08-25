@@ -5,27 +5,29 @@ ten plik ładuje się do kontekstu przy każdej sesji.
 
 ## Gdzie jestem
 
-Etapy **E0, E0.5 i E1 ukończone** (25.08.2026). Fundament działa od przeglądarki
-po bazę, Claude Code skonfigurowany, schemat bazy postawiony: 14 tabel,
-16 ograniczeń CHECK, migracje `001_fundament` i `002_model_danych`.
-Warstwa domenowa ma na razie tylko słowniki i maszyny stanów. Zero danych,
-zero endpointów poza `/api/v1/health`, zero ekranów.
+Etapy **E0, E0.5, E1 i E2 sesja 1** ukończone (25.08.2026). Fundament działa
+od przeglądarki po bazę, Claude Code skonfigurowany, schemat bazy postawiony:
+14 tabel, 16 ograniczeń CHECK, migracje `001_fundament` i `002_model_danych`.
+
+Warstwa domenowa ma słowniki, maszyny stanów, `pieniadze.py` i `kalendarz.py`.
+Pokrycie `domena/` wynosi 100%, 115 testów. Zero danych, zero endpointów
+poza `/api/v1/health`, zero ekranów.
 
 ## Co następne
 
-**E2: warstwa domenowa i reguły biznesowe.** To najważniejszy etap projektu.
-Trzy sesje, po jednej grupie reguł:
-1. `pieniadze.py` (Kwota, VAT, zaokrąglanie) i `kalendarz.py` (święta, dni robocze)
-2. `stan_efektywny.py` — odczyt parametrów obowiązujących na dany dzień
-3. Reguły R1, R2, R4–R7 — każda z testami napisanymi przed implementacją
+**E2 sesja 2: `stan_efektywny.py`** — odczyt parametrów obowiązujących na dany
+dzień. Obsłużyć trzeba: brak wartości, wartości nakładające się w czasie oraz
+wartości niezatwierdzone (te NIE wchodzą do stanu efektywnego, decyzja D4).
 
-Używaj `/nowa-regula`. Skill wymusza właściwą kolejność.
+Potem **E2 sesja 3:** reguły R1, R2, R4–R7. Używaj `/nowa-regula`; skill wymusza
+kolejność „najpierw test".
 
 ## Czego nadal nie wiem
 
 - **Punkt A:** czynsz w umowach netto czy brutto, czy stawka VAT to zawsze 23%.
-  Schemat jest odporny — każda kwota niesie rodzaj i stawkę — ale reguła
-  waloryzacji w E2 musi wiedzieć, na czym liczy.
+  Schemat i typ `Kwota` są odporne — każda kwota niesie rodzaj, stawkę i walutę —
+  ale reguła waloryzacji R2 (sesja 3) musi wiedzieć, na czym mnoży: waloryzacja
+  netto i brutto dają po zaokrągleniu różne kwoty.
 - **Punkt B:** czy występują umowy w EUR płatne w PLN po kursie NBP. Jeśli tak,
   potrzebna waluta płatności odrębna od waluty umowy i reguła kursu.
 - Pytania 1–10 z sekcji 11 koncepcji, w szczególności miejsca postojowe
@@ -41,6 +43,8 @@ Używaj `/nowa-regula`. Skill wymusza właściwą kolejność.
   zamienia stderr w błędy i przerywa skrypt na zwykłym logu INFO Alembica.
 - `frontend/src/funkcje/format.ts`: `useGrouping: 'always'` jest konieczne,
   bo CLDR dla `pl-PL` domyślnie nie grupuje czterocyfrowych kwot.
+- `domena/pieniadze.py`: zaokrąglanie wyłącznie przez `zaokraglij`, zawsze
+  `ROUND_HALF_UP`. Python domyślnie zaokrągla bankowo i 2,345 dałoby 2,34.
 
 ## Czego nie ruszać
 
@@ -49,3 +53,5 @@ Używaj `/nowa-regula`. Skill wymusza właściwą kolejność.
 - Wyzwalacz `trg_log_audytu_bez_zmian` blokuje UPDATE i DELETE na `log_audytu`.
   To jest zamierzone. Poprawianie logu audytu nie jest dozwolone również dla nas.
 - `skladnik_oplaty` celowo nie ma kolumny z kwotą. Uzasadnienie: ADR 004.
+- `Kwota` jest niezmienna i sama się kwantyzuje przy tworzeniu. Każda operacja
+  zwraca nową kwotę. Nie dorabiaj do niej setterów.
