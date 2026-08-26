@@ -18,6 +18,8 @@ $SkryptBazy = Join-Path $PSScriptRoot 'lokalny-postgres.ps1'
 $Backend = Join-Path $KatalogRepo 'backend'
 $Frontend = Join-Path $KatalogRepo 'frontend'
 $Adres = 'http://127.0.0.1:8010'
+#: Ustawiane, gdy program juz dzialal i baza nalezy do tamtego uruchomienia.
+$ZostawBaze = $false
 
 $Host.UI.RawUI.WindowTitle = 'System Zarzadzania Umowami Najmu'
 
@@ -81,6 +83,25 @@ try {
 
     # ---------------------------------------------------------------- 5. aplikacja
     Krok 5 'Startuje aplikacje...'
+
+    # Zajety port 8010 prawie zawsze znaczy, ze program juz raz uruchomiono
+    # i nadal dziala. Uvicorn wypisalby wtedy blad WinError 10048, ktory nikomu
+    # nic nie mowi, i zakonczyl sie od razu, zamykajac to okno.
+    if (Test-NetConnection -ComputerName 127.0.0.1 -Port 8010 -InformationLevel Quiet -WarningAction SilentlyContinue) {
+        Write-Host ''
+        Write-Host '  Program juz dziala.' -ForegroundColor Green
+        Write-Host "  Otwieram go pod adresem: $Adres" -ForegroundColor Green
+        Write-Host ''
+        Write-Host '  Jesli chcesz go uruchomic od nowa, najpierw zamknij tamto okno' -ForegroundColor DarkGray
+        Write-Host '  albo kliknij "Zatrzymaj system.cmd".' -ForegroundColor DarkGray
+        Write-Host ''
+        if (-not $BezPrzegladarki) { Start-Process $Adres }
+        Read-Host '  Nacisnij Enter, zeby zamknac to okno'
+        # Baza nalezy do tamtego uruchomienia, wiec jej nie zatrzymujemy.
+        $ZostawBaze = $true
+        exit 0
+    }
+
     Write-Host ''
     Write-Host "  Gotowe. Program dziala pod adresem: $Adres" -ForegroundColor Green
     Write-Host '  Zamkniecie tego okna zatrzymuje program.' -ForegroundColor DarkGray
@@ -93,6 +114,11 @@ try {
     Push-Location $Backend
     try {
         & uv run uvicorn najem.main:app --host 127.0.0.1 --port 8010
+        # Uvicorn to program zewnetrzny: jego blad nie rzuca wyjatku, wiec bez
+        # tego sprawdzenia okno zamknelo by sie w ulamku sekundy, zanim ktokolwiek
+        # zdazylby przeczytac komunikat. Dla osoby klikajacej ikonke wyglada to
+        # tak, jakby klikniecie nie zrobilo nic.
+        if ($LASTEXITCODE -ne 0) { throw "Aplikacja zakonczyla sie bledem (kod $LASTEXITCODE)." }
     }
     finally { Pop-Location }
 }
@@ -102,8 +128,10 @@ catch {
     exit 1
 }
 finally {
-    Write-Host ''
-    Write-Host '  Zatrzymuje baze danych...' -ForegroundColor DarkGray
-    & powershell -ExecutionPolicy Bypass -File $SkryptBazy stop | Out-Null
-    Write-Host '  System zatrzymany.' -ForegroundColor DarkGray
+    if (-not $ZostawBaze) {
+        Write-Host ''
+        Write-Host '  Zatrzymuje baze danych...' -ForegroundColor DarkGray
+        & powershell -ExecutionPolicy Bypass -File $SkryptBazy stop | Out-Null
+        Write-Host '  System zatrzymany.' -ForegroundColor DarkGray
+    }
 }
