@@ -113,6 +113,8 @@ export interface Zdarzenie {
   encja_id: number
   lokal_id: number | null
   data_zdarzenia: string
+  /** Dni do terminu; ujemnie, gdy termin minął. Liczy API, front tylko pokazuje. */
+  dni_do_terminu: number | null
   waga: WagaZdarzenia
   status: StatusZdarzenia
   tresc: string
@@ -298,4 +300,71 @@ export interface FiltryZdarzen {
   do_dnia?: string
   limit?: number
   offset?: number
+}
+
+// --------------------------------------------------- dokumenty z dysku (skan)
+
+/** Typ dokumentu proponowany z nazwy pliku. `null` znaczy „nazwa nic nie mówi". */
+export type TypDokumentu =
+  | 'umowa'
+  | 'aneks'
+  | 'protokol_przekazania'
+  | 'protokol_zdawczy'
+  | 'polisa'
+  | 'protokol_przegladu'
+  | 'wypowiedzenie'
+  | 'inne'
+
+export interface PlikZeSkanu {
+  nazwa: string
+  sciezka_wzgledna: string
+  rozmiar_bajty: number
+  /** nowy | w_systemie | pominiety */
+  status: string
+  typ_proponowany: TypDokumentu | null
+  numer_proponowany: string | null
+  dokument_id: number | null
+  pominiecie_id: number | null
+}
+
+export interface FolderZeSkanu {
+  nazwa: string
+  sciezka_wzgledna: string
+  powiazanie_id: number | null
+  okres_najmu_id: number | null
+  opis_umowy: string | null
+  nowych: number
+  pliki: PlikZeSkanu[]
+}
+
+export interface BudynekZeSkanu {
+  nazwa_folderu: string
+  budynek_id: number | null
+  budynek_nazwa: string | null
+  foldery: FolderZeSkanu[]
+}
+
+export interface WynikSkanu {
+  katalog: string | null
+  dostepny: boolean
+  komunikat: string | null
+  nowych: number
+  obcietych: number
+  /** Ile katalogów i plików system odmówił udostępnić. */
+  niedostepnych: number
+  budynki: BudynekZeSkanu[]
+}
+
+export interface ZerwanyLink {
+  dokument_id: number
+  nazwa: string | null
+  sciezka_wzgledna: string
+  okres_najmu_id: number | null
+  powod: string
+}
+
+export interface PrzegladLinkow {
+  katalog: string | null
+  sprawdzonych: number
+  zerwane: ZerwanyLink[]
 }

@@ -12,6 +12,8 @@ Plan budowy z etapami i definicjami ukończenia: `docs/plan-budowy-claude-code.m
 ## Komendy
 
 - Cały program (dla użytkownika): `Uruchom system najmu.cmd` albo skrót na pulpicie
+- Zatrzymanie: `Zatrzymaj system.cmd` (program **i** baza).
+  Sam program: `powershell -File narzedzia/zatrzymaj.ps1 -TylkoAplikacja`
 - Baza: `powershell -File narzedzia/lokalny-postgres.ps1 start|stop|status|psql`
 - Backend dev: `cd backend && uv run uvicorn najem.main:app --reload --port 8010`
 - Testy backend: `cd backend && uv run pytest`
@@ -20,6 +22,9 @@ Plan budowy z etapami i definicjami ukończenia: `docs/plan-budowy-claude-code.m
 - Migracja: `cd backend && uv run alembic revision --autogenerate -m "opis"`
 - Frontend dev: `cd frontend && npm run dev` (port 5180, proxy /api na 8010)
 - Testy frontend: `cd frontend && npm test`
+
+Skrót sam przebudowuje interfejs, gdy cokolwiek w `frontend/src` jest nowsze
+niż `frontend/dist/index.html`. Wymuszenie: `narzedzia/uruchom.ps1 -PrzebudujInterfejs`.
 
 ## Zasady architektury
 
@@ -30,6 +35,10 @@ Plan budowy z etapami i definicjami ukończenia: `docs/plan-budowy-claude-code.m
 - Warstwy: `api` → `uslugi` → `repozytoria` → `modele`. Nigdy w drugą stronę.
 - Frontend nie liczy niczego na pieniądzach. Wszystkie wyliczenia po stronie API.
 - Formatowanie w interfejsie tylko przez `frontend/src/funkcje/format.ts`.
+- Zbudowany interfejs serwuje `InterfejsSPA` w `main.py`. Nieznany adres ekranu
+  dostaje `index.html` (bez tego odświeżenie podstrony daje 404), a `index.html`
+  idzie z `Cache-Control: no-cache`. Nie zamieniaj tego na zwykłe `StaticFiles` —
+  jedno i drugie kosztowało już godzinę szukania „dlaczego nie widać zmian".
 
 ## Zasady twarde
 
@@ -48,6 +57,13 @@ Plan budowy z etapami i definicjami ukończenia: `docs/plan-budowy-claude-code.m
   (decyzja D4). Ekstrakcja proponuje, nie decyduje.
 - Brak danych to informacja, nie pusta komórka (decyzja D5). Nigdy nie podstawiaj
   zera ani wartości domyślnej za brakującą daną.
+- Dokument wczytany z dysku (`przechowywanie = link`) **nie jest kopiowany**.
+  W bazie leży ścieżka względna wobec `KATALOG_SKANU`, SHA-256 i rozmiar.
+  Skutek operacyjny: kopia zapasowa musi obejmować bazę **razem** z tym
+  katalogiem. Decyzja i odrzucone warianty: `docs/decyzje/008-dokumenty-linkowane-nie-kopiowane.md`.
+- Oznaczeń lokali nie parsujemy z nazw folderów. Są nieregularne, a cicha
+  pomyłka przypina dokument do nie tej umowy. Folder paruje z umową człowiek,
+  raz, a system pamięta to w `powiazanie_folderu`. To decyzja D5 w praktyce.
 - Nazwy tabel, kolumn i pól domenowych po polsku. Nazwy techniczne po angielsku.
   Komentarze i komunikaty użytkownika po polsku.
 - Zero wywołań sieciowych do zewnętrznych usług, w szczególności do API modeli AI.

@@ -30,6 +30,7 @@ from najem.domena.slowniki import (
     RodzajKwoty,
     StatusPrzetworzenia,
     StatusWeryfikacji,
+    TrybPrzechowywania,
     TypDokumentu,
     TypWartosci,
 )
@@ -71,7 +72,14 @@ class Dokument(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
     #: Od kiedy postanowienia dokumentu obowiazuja. Aneks potrafi dzialac wstecz.
     data_obowiazywania_od: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    #: Sciezka wzgledna. Wzgledem czego -- mowi `przechowywanie`.
     plik_sciezka: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Kopia w przechowalni czy odnosnik do pliku na dysku uzytkownika.
+    przechowywanie: Mapped[TrybPrzechowywania] = mapped_column(
+        slownik(TrybPrzechowywania),
+        nullable=False,
+        server_default=TrybPrzechowywania.KOPIA.value,
+    )
     plik_nazwa_oryginalna: Mapped[str | None] = mapped_column(String(300), nullable=True)
     #: Skrot pliku. Sluzy deduplikacji przy wgrywaniu i dowodowi, ze dokument
     #: sie nie zmienil (plan budowy, sekcja 1.3).
@@ -118,6 +126,13 @@ class Dokument(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
             "hash_sha256",
             unique=True,
             postgresql_where=text("hash_sha256 IS NOT NULL AND usunieto_dnia IS NULL"),
+        ),
+        # Skan folderow pyta o kazdy znaleziony plik, czy juz jest w systemie.
+        # Bez tego indeksu przy kilkuset plikach to kilkaset przejsc po tabeli.
+        Index(
+            "ix_dokument_sciezka_linku",
+            "plik_sciezka",
+            postgresql_where=text("przechowywanie = 'link' AND usunieto_dnia IS NULL"),
         ),
         Index("ix_dokument_okres_typ", "okres_najmu_id", "typ"),
         Index("ix_dokument_nadrzedny", "dokument_nadrzedny_id"),

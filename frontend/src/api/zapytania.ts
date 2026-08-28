@@ -4,7 +4,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pobierz, wyslij, zapisz } from './klient'
+import { pobierz, usun, wyslij, zapisz } from './klient'
 import type {
   Budynek,
   FiltryLokali,
@@ -14,12 +14,14 @@ import type {
   OkresNajmu,
   Parametr,
   Profil,
+  PrzegladLinkow,
   Przeglad,
   Skladnik,
   StanNaDzien,
   StatusWeryfikacji,
   Strona,
   UzytkownikNaLiscie,
+  WynikSkanu,
   Zabezpieczenie,
   Zdarzenie,
 } from './typy'
@@ -30,6 +32,7 @@ export const klucze = {
   lokale: (filtry: FiltryLokali) => ['lokale', filtry] as const,
   stan: (lokalId: number, naDzien?: string) => ['stan', lokalId, naDzien ?? 'dzis'] as const,
   zdarzenia: (filtry: Record<string, unknown>) => ['zdarzenia', filtry] as const,
+  skan: ['skan'] as const,
 }
 
 export function useProfil() {
@@ -335,5 +338,76 @@ export function useDodajPrzeglad() {
   return useMutation({
     mutationFn: (dane: Record<string, unknown>) => wyslij<Przeglad>('/przeglady', dane),
     onSuccess: () => void kolejka.invalidateQueries({ queryKey: ['przeglady'] }),
+  })
+}
+
+// --------------------------------------------------- dokumenty z dysku (skan)
+
+/**
+ * Skan przechodzi po drzewie katalogow i liczy skroty nowych plikow, wiec
+ * jest drozszy niz zwykle zapytanie. Nie odswiezamy go samoczynnie -- czlowiek
+ * naciska "Skanuj ponownie", kiedy cos zmienil w folderach.
+ */
+export function useSkan() {
+  return useQuery({
+    queryKey: klucze.skan,
+    queryFn: () => pobierz<WynikSkanu>('/skan'),
+    staleTime: Infinity,
+    gcTime: 10 * 60 * 1000,
+  })
+}
+
+export function usePowiazFolder() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: { sciezka_wzgledna: string; okres_najmu_id: number }) =>
+      wyslij<{ id: number }>('/skan/powiazania', dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: klucze.skan }),
+  })
+}
+
+export function useOdepnijFolder() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => usun(`/skan/powiazania/${id}`),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: klucze.skan }),
+  })
+}
+
+export function useZaimportujZDysku() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: Record<string, unknown>) => wyslij<{ id: number }>('/skan/importuj', dane),
+    onSuccess: () => {
+      void kolejka.invalidateQueries({ queryKey: klucze.skan })
+      void kolejka.invalidateQueries({ queryKey: ['dokumenty'] })
+    },
+  })
+}
+
+export function usePominPlik() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (dane: { sciezka_wzgledna: string }) =>
+      wyslij<{ id: number }>('/skan/pominiecia', dane),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: klucze.skan }),
+  })
+}
+
+export function useCofnijPominiecie() {
+  const kolejka = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => usun(`/skan/pominiecia/${id}`),
+    onSuccess: () => void kolejka.invalidateQueries({ queryKey: klucze.skan }),
+  })
+}
+
+/** Przeglad odnosnikow: czy zlinkowane pliki nadal leza tam, gdzie lezaly. */
+export function usePrzegladLinkow(wlaczony: boolean) {
+  return useQuery({
+    queryKey: ['przeglad-linkow'],
+    queryFn: () => pobierz<PrzegladLinkow>('/skan/sprawdz'),
+    enabled: wlaczony,
+    staleTime: Infinity,
   })
 }

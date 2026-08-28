@@ -26,6 +26,7 @@ export default function Uklad() {
             <Pozycja do="/">Lokale</Pozycja>
             <Pozycja do="/kartoteka">Kartoteka</Pozycja>
             <Pozycja do="/waloryzacja">Waloryzacja</Pozycja>
+            <Pozycja do="/dokumenty-z-dysku">Dokumenty z dysku</Pozycja>
             <Pozycja do="/import">Import</Pozycja>
             <Pozycja do="/terminy">
               Terminy

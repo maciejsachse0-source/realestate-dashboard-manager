@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BRAK_DANYCH,
   formatujDate,
   formatujKwote,
   formatujPowierzchnie,
   formatujProcent,
   formatujRoznice,
+  opisTerminu,
 } from './format'
 
 describe('formatujKwote', () => {
@@ -71,5 +73,31 @@ describe('formatujProcent', () => {
 
   it('zachowuje znak ujemny', () => {
     expect(formatujProcent('-2.5')).toBe('-2,50%')
+  })
+})
+
+describe('opisTerminu', () => {
+  it('mowi, ile dni zostalo do terminu', () => {
+    expect(opisTerminu(12)).toBe('za 12 dni')
+    expect(opisTerminu(180)).toBe('za 180 dni')
+  })
+
+  it('dzis i jutro maja wlasne slowa', () => {
+    // "za 0 dni" to nie jest zdanie, ktore ktos czyta bez zatrzymania.
+    expect(opisTerminu(0)).toBe('dziś')
+    expect(opisTerminu(1)).toBe('jutro')
+  })
+
+  it('po terminie mowi, o ile', () => {
+    expect(opisTerminu(-8)).toBe('8 dni po terminie')
+    expect(opisTerminu(-1)).toBe('wczoraj, po terminie')
+  })
+
+  it('brak liczby to brak danych, a nie zero', () => {
+    // Decyzja D5: brak danych jest informacja. Zero znaczy "dzis"
+    // i nie wolno mu udawac braku ani odwrotnie.
+    expect(opisTerminu(null)).toBe(BRAK_DANYCH)
+    expect(opisTerminu(undefined)).toBe(BRAK_DANYCH)
+    expect(opisTerminu(0)).not.toBe(BRAK_DANYCH)
   })
 })

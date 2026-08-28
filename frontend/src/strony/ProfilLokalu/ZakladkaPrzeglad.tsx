@@ -49,7 +49,6 @@ export function ZakladkaPrzeglad({
         <Pole etykieta="Oznaczenie">{lokal.oznaczenie}</Pole>
         <Pole etykieta="Typ">{ETYKIETY_TYPU[lokal.typ] ?? lokal.typ}</Pole>
         <Pole etykieta="Status">{ETYKIETY_STATUSU[lokal.status] ?? lokal.status}</Pole>
-        <Pole etykieta="Kondygnacja">{lokal.kondygnacja}</Pole>
         <Pole etykieta="Powierzchnia z ewidencji">
           {lokal.powierzchnia_ewidencyjna
             ? formatujPowierzchnie(lokal.powierzchnia_ewidencyjna)

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { pobierz } from '@/api/klient'
-import { formatujDate } from '@/funkcje/format'
+import { formatujDate, formatujRozmiar } from '@/funkcje/format'
 import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,13 +39,6 @@ const TYPY = [
 ]
 
 const NAZWY_TYPOW = Object.fromEntries(TYPY.map((t) => [t.wartosc, t.etykieta]))
-
-function rozmiar(bajty: number | null): string {
-  if (bajty === null) return '—'
-  if (bajty < 1024) return `${bajty} B`
-  if (bajty < 1024 * 1024) return `${Math.round(bajty / 1024)} kB`
-  return `${(bajty / 1024 / 1024).toFixed(1)} MB`
-}
 
 /**
  * Dokumenty umowy (koncepcja, sekcja 7.2).
@@ -165,7 +158,7 @@ export function ZakladkaDokumenty({ okresId }: { okresId: number | null }) {
                       {d.dokument_nadrzedny_id ? `aneks do #${d.dokument_nadrzedny_id}` : '—'}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                      {rozmiar(d.rozmiar_bajty)}
+                      {formatujRozmiar(d.rozmiar_bajty)}
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <a

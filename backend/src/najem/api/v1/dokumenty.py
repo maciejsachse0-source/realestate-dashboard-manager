@@ -17,7 +17,12 @@ from najem.auth.zaleznosci import Operator, Podglad, Zarzadca
 from najem.baza import SesjaBazy
 from najem.config import ustawienia
 from najem.dokumenty.przechowalnia import BladPliku, przyjmij_plik, wczytaj_plik
-from najem.domena.slowniki import OperacjaAudytu, StatusPrzetworzenia, TypDokumentu
+from najem.domena.slowniki import (
+    OperacjaAudytu,
+    StatusPrzetworzenia,
+    TrybPrzechowywania,
+    TypDokumentu,
+)
 from najem.modele import Dokument, OkresNajmu
 from najem.uslugi.audyt import zapisz_odczyt_wrazliwy, zapisz_zmiane
 
@@ -37,6 +42,8 @@ class DokumentWyjscie(BaseModel):
     hash_sha256: str | None
     rozmiar_bajty: int | None
     typ_mime: str | None
+    #: Kopia w przechowalni systemu czy odnosnik do pliku na dysku.
+    przechowywanie: TrybPrzechowywania
     dokument_nadrzedny_id: int | None
     status_przetworzenia: StatusPrzetworzenia
     wgral_uzytkownik_id: int | None
@@ -179,8 +186,27 @@ def pobierz(dokument_id: int, baza: SesjaBazy, kto: Podglad, request: Request) -
     if dokument.plik_sciezka is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ten dokument nie ma wgranego pliku.")
 
+    # Dokument wgrany przez przeglądarkę leży w przechowalni systemu.
+    # Dokument wczytany z dysku został tam, gdzie leżał — ścieżka jest wtedy
+    # względna wobec katalogu skanowanego, a nie wobec przechowalni.
+    if dokument.przechowywanie == TrybPrzechowywania.LINK:
+        katalog = ustawienia().katalog_skanu
+        if katalog is None:
+            raise HTTPException(
+                status.HTTP_410_GONE,
+                "Ten dokument jest odnośnikiem do pliku na dysku, a katalog "
+                "z dokumentami nie jest ustawiony (KATALOG_SKANU w pliku .env).",
+            )
+        brak = (
+            "Pliku nie ma pod zapisaną ścieżką. Został przeniesiony, przemianowany "
+            "albo usunięty. Sprawdź to przeglądem odnośników."
+        )
+    else:
+        katalog = ustawienia().katalog_dokumentow
+        brak = "Pliku nie ma w przechowalni. Mógł zostać usunięty ręcznie."
+
     try:
-        zawartosc = wczytaj_plik(dokument.plik_sciezka, katalog=ustawienia().katalog_dokumentow)
+        zawartosc = wczytaj_plik(dokument.plik_sciezka, katalog=katalog, brak=brak)
     except BladPliku as blad:
         raise HTTPException(status.HTTP_410_GONE, str(blad)) from blad
 

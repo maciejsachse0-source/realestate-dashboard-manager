@@ -60,6 +60,23 @@ class TypDokumentu(StrEnum):
     INNE = "inne"
 
 
+class TrybPrzechowywania(StrEnum):
+    """Gdzie lezy plik dokumentu.
+
+    KOPIA: plik zostal wgrany przez przegladarke i lezy w przechowalni systemu,
+    pod nazwa pochodzaca ze skrotu tresci. System odpowiada za jego trwalosc.
+
+    LINK: plik zostal wskazany na dysku i tam zostaje. W bazie jest sciezka
+    wzgledna wzgledem katalogu skanowanego. Program niczego nie kopiuje, wiec
+    przeniesienie albo przemianowanie pliku w Eksploratorze zrywa odnosnik --
+    stad ekran "Sprawdz dokumenty" i stad kopia zapasowa musi obejmowac
+    baze razem z katalogiem dokumentow uzytkownika.
+    """
+
+    KOPIA = "kopia"
+    LINK = "link"
+
+
 class StatusPrzetworzenia(StrEnum):
     """Stan pipeline'u dokumentu (koncepcja, sekcja 4.3). Ekstrakcja wchodzi w E9."""
 

@@ -33,8 +33,16 @@ const DOZWOLONE: Record<StatusZabezpieczenia, StatusZabezpieczenia[]> = {
   brak: ['wymagane'],
   wymagane: ['dostarczone', 'brak'],
   dostarczone: ['zwrocone', 'zatrzymane'],
-  zwrocone: [],
-  zatrzymane: [],
+  // Powrot do 'dostarczone' istnieje, bo zwrot i zatrzymanie sa o jeden klik
+  // od pomylki, a wczesniej nie bylo z nich wyjscia.
+  zwrocone: ['dostarczone'],
+  zatrzymane: ['dostarczone'],
+}
+
+/** Powrot ze stanu koncowego nazywa sie cofnieciem, nie kolejnym krokiem. */
+function etykietaPrzycisku(obecny: StatusZabezpieczenia, nowy: StatusZabezpieczenia): string {
+  const cofniecie = nowy === 'dostarczone' && (obecny === 'zwrocone' || obecny === 'zatrzymane')
+  return cofniecie ? 'Cofnij' : OPIS_STATUSU[nowy]
 }
 
 function dzisiaj(): string {
@@ -96,7 +104,14 @@ export function ZakladkaZabezpieczenia({ okresId }: { okresId: number | null }) 
           data_dostarczenia:
             nowy === 'dostarczone' && !z.data_dostarczenia ? dzisiaj() : z.data_dostarczenia,
           data_waznosci: z.data_waznosci,
-          data_zwrotu: nowy === 'zwrocone' && !z.data_zwrotu ? dzisiaj() : z.data_zwrotu,
+          // Cofniecie zwrotu zdejmuje jego date. Zostawiona kluciloby sie
+          // ze statusem i wygladalaby na kaucje zwrocona mimo wszystko.
+          data_zwrotu:
+            nowy === 'zwrocone' && !z.data_zwrotu
+              ? dzisiaj()
+              : nowy === 'dostarczone'
+                ? null
+                : z.data_zwrotu,
           miejsce_przechowywania: z.miejsce_przechowywania,
           dokument_id: z.dokument_id,
           uwagi: z.uwagi,
@@ -173,7 +188,7 @@ export function ZakladkaZabezpieczenia({ okresId }: { okresId: number | null }) 
                   disabled={zmiana.isPending}
                   onClick={() => zmienStatus(z, nowy)}
                 >
-                  {OPIS_STATUSU[nowy]}
+                  {etykietaPrzycisku(z.status, nowy)}
                 </Button>
               ))}
             </div>

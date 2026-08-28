@@ -29,6 +29,12 @@ class Budynek(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
 
     id: Mapped[KluczGlowny]
     nazwa: Mapped[str] = mapped_column(String(80), nullable=False)
+    #: Nazwa katalogu tego budynku w skanowanym drzewie folderow.
+    #: Osobna od nazwy, bo folder na dysku bywa nazwany inaczej niz budynek
+    #: w programie, a przemianowanie go nie moze zrywac powiazan dokumentow.
+    #: NULL znaczy "ten budynek nie ma jeszcze wskazanego folderu" -- to stan
+    #: normalny, a nie brak danych do uzupelnienia.
+    nazwa_folderu: Mapped[str | None] = mapped_column(String(200), nullable=True)
     adres: Mapped[str | None] = mapped_column(Text, nullable=True)
     aktywny: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     uwagi: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -41,6 +47,14 @@ class Budynek(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
             "nazwa",
             unique=True,
             postgresql_where=text("usunieto_dnia IS NULL"),
+        ),
+        # Dwa budynki wskazujace na ten sam folder oznaczalyby, ze skan nie wie,
+        # do ktorego z nich przypisac znalezione tam umowy.
+        Index(
+            "uq_budynek_folder",
+            "nazwa_folderu",
+            unique=True,
+            postgresql_where=text("nazwa_folderu IS NOT NULL AND usunieto_dnia IS NULL"),
         ),
     )
 

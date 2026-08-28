@@ -84,3 +84,32 @@ export function formatujProcent(wartosc: string | number): string {
 
 /** Brak danych to informacja, nie pusta komorka (koncepcja, decyzja D5). */
 export const BRAK_DANYCH = '—'
+
+/**
+ * Ile zostalo do terminu, slowami: "za 12 dni", "dzis", "8 dni po terminie".
+ *
+ * Liczbe dni podaje API (`dni_do_terminu`) -- tutaj jest wylacznie ubranie jej
+ * w slowa. Zero znaczy "dzis", a nie "brak danych", dlatego `null` i zero
+ * musza dawac rozne wyniki.
+ *
+ * Polska liczba mnoga "dnia" jest tu prosta: wyjatkiem jest tylko jedynka.
+ */
+export function opisTerminu(dni: number | null | undefined): string {
+  if (dni === null || dni === undefined || !Number.isFinite(dni)) return BRAK_DANYCH
+  if (dni === 0) return 'dziś'
+  if (dni === 1) return 'jutro'
+  if (dni === -1) return 'wczoraj, po terminie'
+  if (dni > 0) return `za ${dni} dni`
+  return `${Math.abs(dni)} dni po terminie`
+}
+
+/**
+ * Rozmiar pliku, np. "245 kB". Zaokraglamy w gore skali, bo przy liscie
+ * dokumentow chodzi o rzad wielkosci, a nie o dokladna liczbe bajtow.
+ */
+export function formatujRozmiar(bajty: number | null | undefined): string {
+  if (bajty === null || bajty === undefined || !Number.isFinite(bajty)) return BRAK_DANYCH
+  if (bajty < 1024) return `${bajty} B`
+  if (bajty < 1024 * 1024) return `${Math.round(bajty / 1024)} kB`
+  return `${(bajty / 1024 / 1024).toFixed(1)} MB`
+}

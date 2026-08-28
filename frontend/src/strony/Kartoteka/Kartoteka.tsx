@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-import type { Budynek, Najemca } from '@/api/typy'
+import type { Budynek, LokalNaLiscie, Najemca } from '@/api/typy'
 import {
   useBudynki,
   useDodajBudynek,
@@ -22,15 +22,40 @@ import {
 } from '@/komponenty/Formularz'
 import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const TYPY_LOKALU = [
-  { wartosc: 'handlowy', etykieta: 'Handlowy' },
-  { wartosc: 'biurowy', etykieta: 'Biurowy' },
-  { wartosc: 'magazyn', etykieta: 'Magazyn' },
-  { wartosc: 'miejsce_postojowe', etykieta: 'Miejsce postojowe' },
-  { wartosc: 'inny', etykieta: 'Inny' },
-]
+const ETYKIETY_TYPU: Record<string, string> = {
+  handlowy: 'Handlowy',
+  biurowy: 'Biurowy',
+  magazyn: 'Magazyn',
+  miejsce_postojowe: 'Miejsce postojowe',
+  inny: 'Inny',
+}
+
+const ETYKIETY_STATUSU: Record<string, string> = {
+  wolny: 'Wolny',
+  wynajety: 'Wynajęty',
+  w_trakcie_wydania: 'W trakcie wydania',
+}
+
+/** Sortowanie po polsku, z liczbami w kolejnosci naturalnej: 2 przed 10. */
+function porownaj(a: string, b: string): number {
+  return a.localeCompare(b, 'pl', { numeric: true, sensitivity: 'base' })
+}
+
+/** Ta sama lista, co w tabeli. Dwie kopie rozjechalyby sie po pierwszej zmianie. */
+const TYPY_LOKALU = Object.entries(ETYKIETY_TYPU).map(([wartosc, etykieta]) => ({
+  wartosc,
+  etykieta,
+}))
 
 /**
  * Kartoteka: budynki, lokale i najemcy.
@@ -57,18 +82,14 @@ export default function Kartoteka() {
         <TabsList>
           <TabsTrigger value="lokale">Lokale</TabsTrigger>
           <TabsTrigger value="najemcy">Najemcy</TabsTrigger>
-          <TabsTrigger value="budynki">Budynki</TabsTrigger>
         </TabsList>
 
         <div className="mt-4">
           <TabsContent value="lokale">
-            <ListaLokali mozeDodawac={mozeZarzadzac} />
+            <ListaLokali mozeDodawac={mozeZarzadzac} mozeBudynki={mozeBudynki} />
           </TabsContent>
           <TabsContent value="najemcy">
             <ListaNajemcow mozeDodawac={mozeZarzadzac} />
-          </TabsContent>
-          <TabsContent value="budynki">
-            <ListaBudynkow mozeDodawac={mozeBudynki} />
           </TabsContent>
         </div>
       </Tabs>
@@ -76,13 +97,36 @@ export default function Kartoteka() {
   )
 }
 
-// ----------------------------------------------------------------- budynki
+// -------------------------------------------------- budynki wraz z lokalami
 
-function ListaBudynkow({ mozeDodawac }: { mozeDodawac: boolean }) {
+/**
+ * Jedna tabela, pogrupowana budynkami.
+ *
+ * Wczesniej budynki mialy wlasna zakladke i zeby zobaczyc rzecz oczywista —
+ * co jest w ktorym budynku — trzeba bylo skakac miedzy widokami. Budynek jest
+ * naglowkiem, nie osobna lista.
+ */
+function ListaLokali({
+  mozeDodawac,
+  mozeBudynki,
+}: {
+  mozeDodawac: boolean
+  mozeBudynki: boolean
+}) {
+  const lokale = useLokale({ limit: 500 })
   const budynki = useBudynki()
-  const [otwarty, setOtwarty] = useState(false)
+  const [otwartyLokal, setOtwartyLokal] = useState(false)
+  const [otwartyBudynek, setOtwartyBudynek] = useState(false)
 
-  if (budynki.isPending) return <Ladowanie wierszy={3} />
+  if (lokale.isPending || budynki.isPending) return <Ladowanie wierszy={4} />
+  if (lokale.isError) {
+    return (
+      <Blad
+        komunikat={lokale.error instanceof Error ? lokale.error.message : 'Nieznany błąd.'}
+        ponow={() => void lokale.refetch()}
+      />
+    )
+  }
   if (budynki.isError) {
     return (
       <Blad
@@ -92,37 +136,119 @@ function ListaBudynkow({ mozeDodawac }: { mozeDodawac: boolean }) {
     )
   }
 
+  const listaBudynkow = [...budynki.data.pozycje].sort((a, b) => porownaj(a.nazwa, b.nazwa))
+  const brakBudynkow = listaBudynkow.length === 0
+
+  // Budynek bez lokali tez musi byc widoczny, inaczej wyglada na nieistniejacy.
+  const wedlugBudynku = new Map<number, LokalNaLiscie[]>(listaBudynkow.map((b) => [b.id, []]))
+  for (const l of lokale.data.pozycje) {
+    wedlugBudynku.get(l.budynek_id)?.push(l)
+  }
+  for (const grupa of wedlugBudynku.values()) {
+    grupa.sort((a, b) => porownaj(a.oznaczenie, b.oznaczenie))
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        {mozeDodawac ? (
-          <Button onClick={() => setOtwarty(true)}>Dodaj budynek</Button>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Kartoteka budynków należy do administratora.
-          </p>
+      <div className="flex justify-end gap-2">
+        {mozeBudynki && (
+          <Button variant="outline" onClick={() => setOtwartyBudynek(true)}>
+            Dodaj budynek
+          </Button>
+        )}
+        {mozeDodawac && (
+          <Button onClick={() => setOtwartyLokal(true)} disabled={brakBudynkow}>
+            Dodaj lokal
+          </Button>
         )}
       </div>
 
-      {budynki.data.pozycje.length === 0 ? (
+      {brakBudynkow ? (
         <Pusto
           tytul="Nie ma jeszcze żadnego budynku"
           opis="Budynek jest pierwszą rzeczą do wprowadzenia. Bez niego nie da się dodać lokalu."
-          akcja={mozeDodawac ? <Button onClick={() => setOtwarty(true)}>Dodaj budynek</Button> : undefined}
+          akcja={
+            mozeBudynki ? <Button onClick={() => setOtwartyBudynek(true)}>Dodaj budynek</Button> : undefined
+          }
         />
       ) : (
-        <ul className="divide-y rounded-lg border bg-background">
-          {budynki.data.pozycje.map((b) => (
-            <li key={b.id} className="flex items-center gap-4 px-3 py-2.5 text-sm">
-              <span className="font-medium">{b.nazwa}</span>
-              <span className="text-muted-foreground">{b.adres ?? '—'}</span>
-              {!b.aktywny && <span className="text-xs text-muted-foreground">(nieaktywny)</span>}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-lg border bg-background">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-40">Lokal</TableHead>
+                <TableHead className="w-36">Typ</TableHead>
+                <TableHead className="w-36 text-right">Powierzchnia</TableHead>
+                <TableHead>Najemca</TableHead>
+                <TableHead className="w-40">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {listaBudynkow.map((b) => {
+                const grupa = wedlugBudynku.get(b.id) ?? []
+                return (
+                  <Fragment key={b.id}>
+                    {/*
+                      Nagłówek budynku musi być widoczny na pierwszy rzut oka,
+                      bo to on dzieli tę tabelę na sekcje. Stąd ciemne tło,
+                      pionowy pasek z lewej i wersaliki: przy przewijaniu długiej
+                      listy oko ma zaczepienie, którego zwykły pogrubiony wiersz
+                      nie dawał.
+                    */}
+                    <TableRow className="border-y-2 border-border bg-foreground/[0.06] hover:bg-foreground/[0.06]">
+                      <TableCell colSpan={5} className="py-3">
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-l-4 border-foreground/40 pl-3">
+                          <span className="text-sm font-bold tracking-wider uppercase">
+                            {b.nazwa}
+                          </span>
+                          {b.adres && (
+                            <span className="text-xs text-muted-foreground">{b.adres}</span>
+                          )}
+                          <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                            {grupa.length === 0 ? 'bez lokali' : `lokali: ${grupa.length}`}
+                          </span>
+                          {!b.aktywny && (
+                            <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                              nieaktywny
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+
+                    {grupa.map((l) => (
+                      <TableRow key={l.lokal_id}>
+                        <TableCell className="font-medium">{l.oznaczenie}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {ETYKIETY_TYPU[l.typ] ?? l.typ}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {l.powierzchnia_ewidencyjna
+                            ? formatujPowierzchnie(l.powierzchnia_ewidencyjna)
+                            : '—'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {l.najemca_nazwa ?? 'bez najemcy'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {ETYKIETY_STATUSU[l.status_lokalu] ?? l.status_lokalu}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
-      <FormularzBudynku otwarty={otwarty} onZamknij={() => setOtwarty(false)} />
+      <FormularzBudynku otwarty={otwartyBudynek} onZamknij={() => setOtwartyBudynek(false)} />
+      <FormularzLokalu
+        otwarty={otwartyLokal}
+        onZamknij={() => setOtwartyLokal(false)}
+        budynki={listaBudynkow}
+      />
     </div>
   )
 }
@@ -159,73 +285,6 @@ function FormularzBudynku({ otwarty, onZamknij }: { otwarty: boolean; onZamknij:
   )
 }
 
-// ------------------------------------------------------------------ lokale
-
-function ListaLokali({ mozeDodawac }: { mozeDodawac: boolean }) {
-  const lokale = useLokale({ limit: 500 })
-  const budynki = useBudynki()
-  const [otwarty, setOtwarty] = useState(false)
-
-  if (lokale.isPending) return <Ladowanie wierszy={4} />
-  if (lokale.isError) {
-    return (
-      <Blad
-        komunikat={lokale.error instanceof Error ? lokale.error.message : 'Nieznany błąd.'}
-        ponow={() => void lokale.refetch()}
-      />
-    )
-  }
-
-  const brakBudynkow = (budynki.data?.pozycje.length ?? 0) === 0
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        {mozeDodawac && (
-          <Button onClick={() => setOtwarty(true)} disabled={brakBudynkow}>
-            Dodaj lokal
-          </Button>
-        )}
-      </div>
-
-      {brakBudynkow && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Najpierw dodaj budynek — lokal musi do czegoś należeć.
-        </p>
-      )}
-
-      {lokale.data.pozycje.length === 0 ? (
-        <Pusto
-          tytul="Nie ma jeszcze żadnego lokalu"
-          opis="Lokal jest bytem centralnym systemu. Umowy i najemcy się zmieniają, lokal trwa."
-        />
-      ) : (
-        <ul className="divide-y rounded-lg border bg-background">
-          {lokale.data.pozycje.map((l) => (
-            <li key={l.lokal_id} className="flex flex-wrap items-center gap-4 px-3 py-2.5 text-sm">
-              <span className="w-28 font-medium">{l.oznaczenie}</span>
-              <span className="w-20 text-muted-foreground">{l.budynek_nazwa}</span>
-              <span className="w-28 text-muted-foreground">{l.typ}</span>
-              <span className="w-28 text-right tabular-nums text-muted-foreground">
-                {l.powierzchnia_ewidencyjna
-                  ? formatujPowierzchnie(l.powierzchnia_ewidencyjna)
-                  : '—'}
-              </span>
-              <span className="text-muted-foreground">{l.najemca_nazwa ?? 'bez najemcy'}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <FormularzLokalu
-        otwarty={otwarty}
-        onZamknij={() => setOtwarty(false)}
-        budynki={budynki.data?.pozycje ?? []}
-      />
-    </div>
-  )
-}
-
 function FormularzLokalu({
   otwarty,
   onZamknij,
@@ -239,7 +298,6 @@ function FormularzLokalu({
   const [budynekId, setBudynekId] = useState('')
   const [oznaczenie, setOznaczenie] = useState('')
   const [typ, setTyp] = useState('')
-  const [kondygnacja, setKondygnacja] = useState('')
   const [powierzchnia, setPowierzchnia] = useState('')
 
   return (
@@ -247,7 +305,6 @@ function FormularzLokalu({
       otwarty={otwarty}
       onZamknij={() => {
         setOznaczenie('')
-        setKondygnacja('')
         setPowierzchnia('')
         onZamknij()
       }}
@@ -258,7 +315,6 @@ function FormularzLokalu({
           oznaczenie: oznaczenie.trim(),
           typ,
           status: 'wolny',
-          kondygnacja: pustyNaNull(kondygnacja),
           powierzchnia_ewidencyjna: liczbaLubNull(powierzchnia),
         })
       }
@@ -281,12 +337,6 @@ function FormularzLokalu({
         podpowiedz="Tak, jak lokal jest nazywany w umowach, na przykład 18A/12."
       />
       <PoleWyboru nazwa="typ" etykieta="Typ" wartosc={typ} onZmiana={setTyp} wymagane opcje={TYPY_LOKALU} />
-      <PoleTekstowe
-        nazwa="kondygnacja"
-        etykieta="Kondygnacja"
-        wartosc={kondygnacja}
-        onZmiana={setKondygnacja}
-      />
       <PoleTekstowe
         nazwa="powierzchnia"
         etykieta="Powierzchnia z ewidencji (m²)"

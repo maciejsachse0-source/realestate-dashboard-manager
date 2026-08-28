@@ -406,8 +406,16 @@ class TestRozpoznawanieTypu:
         """Jedna pomyłka w danych nie może pozwolić na czytanie dysku."""
         from najem.dokumenty.przechowalnia import BladPliku, wczytaj_plik
 
-        with pytest.raises(BladPliku, match="poza katalog"):
+        with pytest.raises(BladPliku, match="poza dozwolony katalog"):
             wczytaj_plik("../../../etc/passwd", katalog=tmp_path)
+
+    def test_sciezka_ktorej_system_nie_potrafi_rozwiazac(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        """Sciezka sieciowa podnosi OSError w `resolve()`. Bez przechwycenia
+        wychodzilo to z API jako 500 zamiast czytelnej odmowy."""
+        from najem.dokumenty.przechowalnia import BladPliku, wczytaj_plik
+
+        with pytest.raises(BladPliku):
+            wczytaj_plik("//serwer-ktorego-nie-ma/udzial/umowa.pdf", katalog=tmp_path)
 
 
 class TestUprawnieniaDokumentow:

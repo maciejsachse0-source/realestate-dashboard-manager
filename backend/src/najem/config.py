@@ -32,6 +32,12 @@ class Ustawienia(BaseSettings):
         default=KATALOG_REPO / "dane" / "dokumenty", alias="KATALOG_DOKUMENTOW"
     )
 
+    # Katalog z dokumentami uzytkownika na dysku, skanowany w poszukiwaniu umow.
+    # Program niczego stad nie kopiuje ani nie przenosi: zaimportowany dokument
+    # zostaje odnosnikiem do pliku lezacego w tym drzewie. Pusta wartosc znaczy
+    # "nie skanujemy nic" i wtedy caly ekran skanu mowi, co ustawic.
+    katalog_skanu: Path | None = Field(default=None, alias="KATALOG_SKANU")
+
     # Strefa prezentacji. W bazie i w logice zawsze UTC (plan, sekcja 1.1 punkt D).
     strefa_prezentacji: str = Field(default="Europe/Warsaw", alias="STREFA_PREZENTACJI")
 

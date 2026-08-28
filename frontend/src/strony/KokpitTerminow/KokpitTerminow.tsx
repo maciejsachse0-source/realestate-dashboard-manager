@@ -11,7 +11,7 @@ import {
   useUzytkownicy,
   useZdarzenia,
 } from '@/api/zapytania'
-import { formatujDate } from '@/funkcje/format'
+import { formatujDate, opisTerminu } from '@/funkcje/format'
 import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -237,6 +237,33 @@ function Filtry({
   )
 }
 
+/**
+ * Ile dni zostalo do terminu. To jest informacja, dla ktorej ktos otwiera
+ * ten ekran: sama data wymaga liczenia w glowie, a przy dwudziestu wierszach
+ * nikt tego nie robi.
+ *
+ * Po terminie kolor jest ostrzegawczy, bo to juz nie jest zapowiedz.
+ */
+function LicznikDni({ dni }: { dni: number | null }) {
+  if (dni === null) return null
+
+  const poTerminie = dni < 0
+  const dzisiaj = dni === 0
+  const styl = poTerminie
+    ? 'border-destructive/40 bg-destructive/10 text-destructive'
+    : dzisiaj
+      ? 'border-amber-500/40 bg-amber-500/10 text-amber-700'
+      : 'border-border bg-muted text-foreground'
+
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums ${styl}`}
+    >
+      {opisTerminu(dni)}
+    </span>
+  )
+}
+
 function Wiersz({
   zdarzenie,
   uzytkownicy,
@@ -269,7 +296,8 @@ function Wiersz({
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm">{zdarzenie.tresc}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <LicznikDni dni={zdarzenie.dni_do_terminu} />
             {formatujDate(zdarzenie.data_zdarzenia)}
             {przypisany && ` · ${przypisany.imie_nazwisko}`}
             {zdarzenie.status === 'odroczone' &&

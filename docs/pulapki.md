@@ -237,3 +237,74 @@ jest operacją na całym portfelu naraz: użytkownik zaznacza i zatwierdza
 wszystko jednym ruchem. Strona po pięćdziesiąt umów zamieniłaby jeden rytuał
 raz do roku w dwadzieścia osobnych zatwierdzeń i ukryła część wyłączeń.
 `/waloryzacja/wskazniki` paginację ma, bo to zwykła lista.
+
+### Dokumenty z dysku są odnośnikami, nie kopiami
+`dokument.przechowywanie` rozstrzyga, względem czego liczy się `plik_sciezka`:
+`kopia` → `KATALOG_DOKUMENTOW`, `link` → `KATALOG_SKANU`. Endpoint pobierający
+plik musi wybrać właściwy katalog, inaczej zlinkowany dokument zwraca 410
+mimo istniejącego pliku. Szczegóły i odrzucone warianty: [ADR 008](decyzje/008-dokumenty-linkowane-nie-kopiowane.md).
+
+**Kopia zapasowa samej bazy nie wystarcza.** Backup musi obejmować bazę razem
+z katalogiem wskazanym przez `KATALOG_SKANU`. Przeniesienie albo przemianowanie
+pliku w Eksploratorze zrywa odnośnik — wykrywa to dopiero przycisk
+„Sprawdź odnośniki" (`GET /api/v1/skan/sprawdz`).
+
+### Skan nie parsuje oznaczeń lokali z nazw folderów
+Oznaczenia są nieregularne: raz od zera, raz od jedynki, czasem `1.A` i `1.B`,
+czasem z podkreśleniem. Każde parsowanie dawałoby ciche pomyłki, czyli dokument
+przypięty do nie tej umowy. Zamiast tego folder paruje się z umową raz, ręcznie,
+a `powiazanie_folderu` to pamięta. To ta sama zasada, co decyzja D5: brak danych
+jest informacją, nie powodem do zgadywania.
+
+Konsekwencja, o której trzeba wiedzieć: lista wyboru przy parowaniu pokazuje
+**aktualne** umowy lokali. Folderu po poprzednim najemcy nie da się dziś
+przypiąć do jego zakończonej umowy — trzeba by endpointu listującego okresy
+najmu razem z historycznymi.
+
+### Pominięcia pamiętane po skrócie, nie po ścieżce
+`pominiety_plik` trzyma SHA-256, bo plik przemianowany albo przeniesiony do
+innego folderu to nadal ten sam plik. Dopasowanie po ścieżce jest tylko
+przyspieszaczem (żeby nie liczyć skrótu każdego pliku przy każdym skanie),
+a nie kryterium.
+
+### Stary format Worda rozpoznajemy po strumieniu OLE
+`.doc`, `.xls` i `.ppt` mają **wspólną** sygnaturę OLE2 (`D0CF11E0A1B11AE1`),
+więc sama sygnatura nie mówi, co to za plik. Rozróżnia je obecność nazwy
+strumienia `WordDocument` (UTF-16LE) w pierwszym megabajcie. To nie jest pełne
+parsowanie struktury OLE i celowo nim nie jest — wystarcza, a pełny parser
+byłby nową zależnością dla jednego formatu.
+
+### Skrót przebudowuje interfejs po czasie plików, nie po jego istnieniu
+`narzedzia/uruchom.ps1`, krok 4. Pierwotny warunek brzmiał „buduj, jeśli nie ma
+`dist/index.html`". Po pierwszym zbudowaniu skrót nie przebudował interfejsu już
+nigdy: backend startował z bieżącego kodu, front z bundla sprzed zmian.
+Dla osoby klikającej ikonkę wyglądało to tak, jakby zmiany nie istniały —
+i tak właśnie zostało zgłoszone.
+
+Teraz `Powod-Przebudowy` porównuje czas modyfikacji `dist/index.html` z plikami
+w `frontend/src`, `index.html`, `package.json` i `vite.config.ts`.
+`node_modules` celowo poza listą: `npm install` dotyka tysięcy plików i przy
+każdym uruchomieniu wymuszałby przebudowę.
+
+### `index.html` serwowany z `Cache-Control: no-cache`
+`main.py`, klasa `InterfejsBezCache`. Pliki w `assets/` mają skrót treści
+w nazwie, więc mogą leżeć w cache'u przeglądarki dowolnie długo. `index.html`
+skrótu nie ma i to on wskazuje na aktualne pliki — podany z cache'u pokazuje
+poprzednią wersję programu mimo zaktualizowanego serwera.
+
+`no-cache` nie zabrania cache'owania, tylko wymusza sprawdzenie: przy
+niezmienionym pliku przeglądarka dostaje 304 i nie pobiera go ponownie.
+Ma to dwa testy w `tests/api/test_zdrowie.py` — jeden pilnuje nagłówka na
+`index.html`, drugi tego, żeby nie trafił na pliki z `assets/`.
+
+### `GET /api/v1/skan` nie jest stronicowany
+Świadomie, tak jak przebieg waloryzacji. To nie jest lista rekordów, tylko
+drzewo katalogów zestawione ze stanem bazy — stronicowanie rozbiłoby budynek
+na dwie strony i ukryło część folderów. Zamiast paginacji jest `LIMIT_PLIKOW`
+(3000) i pole `obcietych`, które mówi wprost, ile pozycji nie weszło.
+
+Osobno `niedostepnych` liczy katalogi i pliki, których system nie udostępnił
+(brak uprawnień, ścieżka dłuższa niż limit Windowsa, odłączony dysk sieciowy).
+Wcześniej jeden taki katalog kończył cały skan błędem 500 i użytkownik nie
+widział ani jednego swojego dokumentu. Milczące pomijanie byłoby złamaniem
+decyzji D5, więc liczba trafia na ekran.

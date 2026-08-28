@@ -16,6 +16,7 @@ from sqlalchemy import ColumnElement, case, func, or_, select
 
 from najem.auth.zaleznosci import Operator, Podglad
 from najem.baza import SesjaBazy
+from najem.domena.kalendarz import dni_do
 from najem.domena.slowniki import (
     OperacjaAudytu,
     StatusZdarzenia,
@@ -34,6 +35,20 @@ from najem.schematy.wspolne import LIMIT_DOMYSLNY, LIMIT_MAKSYMALNY, Strona
 from najem.uslugi.audyt import zapisz_zmiane
 from najem.uslugi.generator_zdarzen import uruchom_generator
 from najem.zadania.harmonogram import dzis_lokalnie
+
+
+def na_wyjscie(zdarzenie: Zdarzenie) -> ZdarzenieWyjscie:
+    """Zdarzenie z policzona liczba dni do terminu.
+
+    Liczymy tutaj, a nie w przegladarce, bo wyliczenia naleza do API
+    (CLAUDE.md, zasady architektury). Dzien odniesienia bierzemy w strefie
+    prezentacji: o drugiej w nocy UTC pokazuje jeszcze dzien poprzedni,
+    a "zostaly 3 dni" musi znaczyc trzy polskie dni.
+    """
+    wyjscie = ZdarzenieWyjscie.model_validate(zdarzenie)
+    wyjscie.dni_do_terminu = dni_do(zdarzenie.data_zdarzenia, dzis_lokalnie())
+    return wyjscie
+
 
 #: Krytyczne na gorze, potem ostrzezenia, na koncu informacje.
 KOLEJNOSC_WAGI = case(
@@ -134,7 +149,7 @@ def lista_zdarzen(
     ).all()
 
     return Strona(
-        pozycje=[ZdarzenieWyjscie.model_validate(z) for z in pozycje],
+        pozycje=[na_wyjscie(z) for z in pozycje],
         wszystkich=wszystkich,
         limit=limit,
         offset=offset,
@@ -170,7 +185,7 @@ def oznacz_obsluzone(
 
     zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA, uzytkownik_id=kto.uzytkownik.id)
     sesja.commit()
-    return ZdarzenieWyjscie.model_validate(zdarzenie)
+    return na_wyjscie(zdarzenie)
 
 
 @router.post(
@@ -197,7 +212,7 @@ def odrocz(
 
     zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA, uzytkownik_id=kto.uzytkownik.id)
     sesja.commit()
-    return ZdarzenieWyjscie.model_validate(zdarzenie)
+    return na_wyjscie(zdarzenie)
 
 
 @router.post(
@@ -218,4 +233,4 @@ def przypisz(
     zdarzenie.przypisany_uzytkownik_id = dane.uzytkownik_id
     zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA, uzytkownik_id=kto.uzytkownik.id)
     sesja.commit()
-    return ZdarzenieWyjscie.model_validate(zdarzenie)
+    return na_wyjscie(zdarzenie)

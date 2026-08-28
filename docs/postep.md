@@ -20,16 +20,24 @@ nie warunek działania.
 
 Dokumenty: wgrywanie z rozpoznaniem typu po zawartości pliku, deduplikacja
 po SHA-256, hierarchia umowa → aneks, pobieranie ze śladem w audycie.
+Doszedł drugi kanał: **„Dokumenty z dysku"** — program czyta gotowe drzewo
+katalogów (`KATALOG_SKANU`, układ `budynek/Umowy najmu/folder lokalu/pliki`),
+podpowiada rodzaj dokumentu z nazwy pliku i pozwala go dodać **jako odnośnik,
+bez kopiowania** ([ADR 008](decyzje/008-dokumenty-linkowane-nie-kopiowane.md)).
+Folder paruje się z umową raz, ręcznie; pominięty plik nie wraca przy kolejnym
+skanie. Przycisk „Sprawdź odnośniki" wykrywa pliki przeniesione albo podmienione.
+**Skutek dla kopii zapasowych: backup musi obejmować bazę razem z katalogiem
+dokumentów użytkownika.**
 
 Warstwa domenowa jest kompletna (reguły R1, R2, R4–R7, R9), pokrycie `domena/`
 wynosi 100%. Generator zdarzeń chodzi codziennie o 6:00 i jest idempotentny.
-Cztery migracje Alembica, jedna głowa.
+Pięć migracji Alembica, jedna głowa.
 
 Zastrzeżenie do R5: część liczbowa (wartość zabezpieczenia jako wielokrotność
 czynszu) **nie jest zaimplementowana**. Wymaga krotności jako liczby, a model
 trzyma opis słowny. System przypomina o przeliczeniu, nie liczy za człowieka.
 
-Kontrola na dziś: **464 testy backendu + 25 frontendu**, `mypy` strict i `ruff`
+Kontrola na dziś: **542 testy backendu + 41 frontendu**, `mypy` strict i `ruff`
 czysto, `npm run build` przechodzi. E8 przeszedł też próbę na żywych danych:
 propozycja, zatwierdzenie, idempotencja przy powtórzeniu, waloryzacja rok po
 roku i eksport XLSX.
@@ -39,6 +47,30 @@ wszystkie poza jednym (patrz niżej). Najpoważniejsze: waloryzacja rozpoznawał
 własny poprzedni przebieg po dacie, przez co brała aneks za waloryzację
 i pozwalała niezatwierdzonej propozycji zablokować umowę na cały rok
 ([ADR 007](decyzje/007-znacznik-waloryzacji-na-parametrze.md)).
+
+### Poprawki interfejsu z 28.08.2026
+
+Pierwszy dzień, w którym program oglądał człowiek. Wyszło z tego:
+
+* profil lokalu stracił pole „Kondygnacja"; zwrot i zatrzymanie zabezpieczenia
+  da się cofnąć (były jednym klikiem od pomyłki, bez drogi powrotnej);
+* kartoteka to jedna tabela pogrupowana budynkami zamiast trzech zakładek.
+  Nagłówek budynku ma tło, grube obramowanie i wersaliki, bo przy przewijaniu
+  oko musi mieć zaczepienie;
+* kokpit terminów pokazuje liczbę dni do terminu („za 12 dni", „8 dni po
+  terminie"). Liczy to API (`dni_do_terminu`, `domena/kalendarz.dni_do`),
+  w strefie warszawskiej, nie w UTC.
+
+Trzy błędy infrastrukturalne, przez które zmian **nie było widać** mimo
+poprawnego kodu — wszystkie załatane i opisane w `pulapki.md`:
+
+1. skrót budował interfejs tylko wtedy, gdy `dist/index.html` nie istniał,
+   więc po pierwszym uruchomieniu nie przebudował go nigdy;
+2. `index.html` szedł bez nagłówka cache, więc przeglądarka podawała własną
+   kopię wskazującą na stary bundle;
+3. **serwer zwracał 404 na każdy adres poza stroną główną** — odświeżenie
+   podstrony, wklejony adres i zakładka w przeglądarce kończyły się błędem.
+   Działało wyłącznie klikanie w menu.
 
 ## Co następne
 
@@ -59,6 +91,12 @@ Zostało na później: podgląd PDF przez pdf.js (dziś plik otwiera się w karc
 przeglądarki), eksport XLSX, zapisane widoki, wybór kolumn, wirtualizacja,
 edycja i usuwanie rekordów z interfejsu.
 
+Ze skanu folderów zostały dwie rzeczy do dołożenia, obie znane i opisane
+w `pulapki.md`: parowanie folderu z **zakończoną** umową (dziś lista pokazuje
+tylko aktualne, bo nie ma endpointu listującego okresy najmu) oraz ustawianie
+`budynek.nazwa_folderu` z interfejsu (kolumna jest, formularza kartoteki jeszcze
+nie; dopóki jej nie ma, dopasowanie idzie po nazwie budynku).
+
 ## Czego nadal nie wiem
 
 - **Punkt A** (netto czy brutto, czy VAT to zawsze 23%) przestał blokować —
@@ -72,9 +110,9 @@ edycja i usuwanie rekordów z interfejsu.
   01.02.2028. Do potwierdzenia na realnych umowach; zmiana to jedna stała.
 - Pytania 1–10 z sekcji 11 koncepcji, w szczególności miejsca postojowe
   (osobny lokal czy składnik opłaty) i który dokładnie wskaźnik GUS.
-- **Interfejsu nikt nie widział w przeglądarce.** Buduje się, odpowiada
-  i jest pokryty testami renderującymi (25 testów), ale układu graficznego
-  nie obejrzał człowiek. Do zrobienia przy najbliższej okazji.
+- Ekran „Dokumenty z dysku" **nie był jeszcze uruchomiony na prawdziwym
+  drzewie katalogów użytkownika**. Testy chodzą po katalogu tymczasowym.
+  Pierwsze uruchomienie wymaga ustawienia `KATALOG_SKANU` w pliku `.env`.
 
 ## Jak wrócić do pracy
 

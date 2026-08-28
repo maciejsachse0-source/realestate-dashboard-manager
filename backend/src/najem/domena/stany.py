@@ -63,8 +63,12 @@ PRZEJSCIA_ZABEZPIECZENIA: Mapping[StatusZabezpieczenia, frozenset[StatusZabezpie
     StatusZabezpieczenia.DOSTARCZONE: frozenset(
         {StatusZabezpieczenia.ZWROCONE, StatusZabezpieczenia.ZATRZYMANE}
     ),
-    StatusZabezpieczenia.ZWROCONE: frozenset(),
-    StatusZabezpieczenia.ZATRZYMANE: frozenset(),
+    # Zwrot i zatrzymanie sa odwracalne, bo to jeden klik od pomylki, a kaucja
+    # zwrocona omylkowo znikala z widoku bez sposobu na cofniecie. Powrot idzie
+    # do stanu "dostarczone", czyli tam, skad przejscie wyszlo. Slad zostaje
+    # w audycie.
+    StatusZabezpieczenia.ZWROCONE: frozenset({StatusZabezpieczenia.DOSTARCZONE}),
+    StatusZabezpieczenia.ZATRZYMANE: frozenset({StatusZabezpieczenia.DOSTARCZONE}),
 }
 
 # Zdarzenie odroczone wraca do otwartych, gdy minie termin odroczenia.

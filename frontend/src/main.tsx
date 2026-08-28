@@ -11,6 +11,7 @@ import Kartoteka from '@/strony/Kartoteka/Kartoteka'
 import KokpitTerminow from '@/strony/KokpitTerminow/KokpitTerminow'
 import Logowanie from '@/strony/Logowanie/Logowanie'
 import ProfilLokalu from '@/strony/ProfilLokalu/ProfilLokalu'
+import Skan from '@/strony/Skan/Skan'
 import Waloryzacja from '@/strony/Waloryzacja/Waloryzacja'
 import './index.css'
 
@@ -50,6 +51,7 @@ function Aplikacja() {
         <Route path="/terminy" element={<KokpitTerminow />} />
         <Route path="/kartoteka" element={<Kartoteka />} />
         <Route path="/import" element={<Import />} />
+        <Route path="/dokumenty-z-dysku" element={<Skan />} />
         <Route path="/waloryzacja" element={<Waloryzacja />} />
         <Route path="/lokale/:lokalId" element={<ProfilLokalu />} />
         <Route path="*" element={<Navigate to="/" replace />} />

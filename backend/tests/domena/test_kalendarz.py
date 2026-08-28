@@ -12,6 +12,7 @@ import pytest
 from najem.domena.kalendarz import (
     czy_dzien_roboczy,
     czy_swieto,
+    dni_do,
     dodaj_dni_robocze,
     dzien_miesiaca,
     nastepny_dzien_roboczy,
@@ -204,3 +205,23 @@ class TestDodawanieMiesiecy:
         from najem.domena.kalendarz import dodaj_miesiace
 
         assert dodaj_miesiace(dodaj_miesiace(date(2026, 1, 31), 1), -1) == date(2026, 1, 28)
+
+
+class TestDniDoTerminu:
+    """Liczba dni do terminu na kokpicie. Zero znaczy "dzis", nie "brak"."""
+
+    def test_termin_w_przyszlosci(self) -> None:
+        assert dni_do(date(2026, 9, 10), date(2026, 8, 28)) == 13
+
+    def test_termin_dzisiaj_to_zero(self) -> None:
+        assert dni_do(date(2026, 8, 28), date(2026, 8, 28)) == 0
+
+    def test_termin_miniony_jest_ujemny(self) -> None:
+        assert dni_do(date(2026, 8, 20), date(2026, 8, 28)) == -8
+
+    def test_przelom_roku(self) -> None:
+        assert dni_do(date(2027, 1, 2), date(2026, 12, 30)) == 3
+
+    def test_rok_przestepny(self) -> None:
+        """2028 jest przestepny, wiec luty ma 29 dni i musi je policzyc."""
+        assert dni_do(date(2028, 3, 1), date(2028, 2, 27)) == 3
