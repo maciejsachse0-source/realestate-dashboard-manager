@@ -12,9 +12,9 @@ i bez żadnych usług zewnętrznych.
 
 ## Stan: etapy E0 – E8 ukończone
 
-Program działa od kliknięcia skrótu po dane. Można się zalogować, przeglądać
-lokale, filtrować je, wejść w profil lokalu i zobaczyć stan umowy na dowolny
-dzień wstecz oraz listę terminów wymagających uwagi.
+Program działa od kliknięcia skrótu po dane. Otwiera się od razu na liście
+lokali: można je filtrować, wejść w profil lokalu i zobaczyć stan umowy na
+dowolny dzień wstecz oraz listę terminów wymagających uwagi.
 
 Waloryzacja roczna: wskaźnik wprowadza się **raz**, a system liczy propozycję
 dla każdej umowy, która mu podlega, pokazuje wyłączenia z powodem i zapisuje
@@ -30,7 +30,7 @@ godzin raz do roku.
 | Interfejs | dashboard, kartoteka, kokpit terminów, profil lokalu, dokumenty z dysku, import, waloryzacja |
 | Dokumenty | typ rozpoznawany po zawartości, deduplikacja, hierarchia aneksów |
 
-Kontrola: 481 testów backendu, 50 frontendu, `mypy` strict i `ruff` czysto.
+Kontrola: 630 testów backendu, 56 frontendu, `mypy` strict i `ruff` czysto.
 
 **Od tego miejsca system zastępuje Excela.** Czego jeszcze nie ma: ekstrakcji
 danych z umów (OCR), podglądu PDF w aplikacji, edycji i usuwania rekordów
