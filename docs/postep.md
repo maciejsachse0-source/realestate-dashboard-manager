@@ -157,12 +157,10 @@ zakres E9.7 jest nierozstrzygnięty.
 **E9 i dalej** według planu budowy. Nic z tego nie jest już warunkiem, żeby
 system działał — od E8 zastępuje Excela.
 
-E9 ma już fundament, ale **nie jest podpięty do niczego**: `domena/ekstrakcja/`
-(wzorce dat, liczb i tekstu, czysta domena) oraz `dokumenty/tekst_z_pliku.py`
-(PDF i DOCX; OCR i stary `.doc` świadomie poza zakresem). Plan całości:
-[`docs/plan-e9-ekstrakcja.md`](plan-e9-ekstrakcja.md). API i interfejs jeszcze
-tego nie widzą — dopóki tak jest, program czyta o pliku tylko nazwę, sygnaturę
-i SHA-256, dokładnie jak opisuje zakładka „Jak to działa".
+Fundament E9 stoi, ale **nie jest podpięty do niczego** — opis wyżej.
+Dopóki tak jest, zakładka „Jak to działa" mówi prawdę: program czyta o pliku
+tylko nazwę, sygnaturę i SHA-256. Etap, który to zmieni, musi poprawić ten
+opis razem z kodem.
 
 Najpilniejsze z zaległości: **odpowiedź na punkt B** (EUR/NBP). Waloryzacja
 liczy już sumy osobno dla każdej waluty, ale waluta płatności odrębna
