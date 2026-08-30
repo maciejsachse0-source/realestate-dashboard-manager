@@ -51,7 +51,7 @@ Zastrzeżenie do R5: część liczbowa (wartość zabezpieczenia jako wielokrotn
 czynszu) **nie jest zaimplementowana**. Wymaga krotności jako liczby, a model
 trzyma opis słowny. System przypomina o przeliczeniu, nie liczy za człowieka.
 
-Kontrola na dziś: **481 testów backendu + 56 frontendu**, `mypy` strict i `ruff`
+Kontrola na dziś: **630 testów backendu + 56 frontendu**, `mypy` strict i `ruff`
 czysto, `npm run build` przechodzi. E8 przeszedł też próbę na żywych danych:
 propozycja, zatwierdzenie, idempotencja przy powtórzeniu, waloryzacja rok po
 roku i eksport XLSX.
@@ -92,10 +92,77 @@ poprawnego kodu — wszystkie załatane i opisane w `pulapki.md`:
    podstrony, wklejony adres i zakładka w przeglądarce kończyły się błędem.
    Działało wyłącznie klikanie w menu.
 
+## E9 w toku: dane z dokumentów, nie z klawiatury
+
+Zaczęte 28.08.2026. Pełny plan: [`docs/plan-e9-ekstrakcja.md`](plan-e9-ekstrakcja.md).
+
+Do dziś **każda liczba w profilu lokalu była wpisana ręcznie albo wzięta
+z arkusza**. Program czytał z pliku wyłącznie nazwę, sygnaturę pierwszych
+bajtów i SHA-256 — zero tekstu. Kolumny `dokument_zrodlowy_id`,
+`zrodlo_strona`, `pewnosc` w `parametr_wartosc` istnieją od E2 i stoją puste.
+E9 je wypełnia.
+
+Gotowe są **fundamenty, jeszcze bez efektu widocznego w programie**:
+
+* `narzedzia/sprawdz-dokumenty.py` — statystyka archiwum bez zależności
+  (E9.0). Mówi, ile plików ma warstwę tekstową, a ile jest skanem. Wypisuje
+  same liczby; nazwy plików tylko z jawnym `--pliki`, bo w nazwie umowy
+  zwykle siedzi nazwa najemcy;
+* `dokumenty/tekst_z_pliku.py` — trzy czytniki za wspólnym `Protocol` (E9.1).
+  PDF przez `pypdf`, DOCX samą standardową biblioteką, stary `.doc` odmawia
+  z instrukcją „zapisz jako PDF" zamiast po cichu zwrócić pustkę nie do
+  odróżnienia od skanu;
+* `domena/ekstrakcja/{tekst,liczby,daty}.py` — czytanie polskich kwot, dat
+  i terminów względnych (E9.2, część).
+
+Zostaje: `segmentacja.py` (podział na § z mapą offsetów), `propozycja.py`,
+`silnik.py`, migracja `008_ekstrakcja`, pierwszy wzorzec end-to-end
+(powierzchnia), ekran weryfikacji, reszta wzorców, aneksy jako diff.
+
+### Cztery rzeczy, które łatwo zepsuć
+
+* **Granica warstw jest tu ważniejsza niż gdziekolwiek indziej.** Tylko
+  `dokumenty/tekst_z_pliku.py` zna formaty plików. Wszystko powyżej pracuje
+  na napisach. `pypdf` i `openpyxl` są na liście zakazanych importów
+  w `test_granice_warstw.py` — gdyby `pypdf` wszedł do `domena/`, każdy test
+  wzorca wymagałby zbudowania pliku PDF.
+* **NFKC zamienia `m²` na `m2`** i każdą odmianę spacji na zwykłą. Wzorzec
+  powierzchni ma szukać `m2`. Sprawdzone empirycznie — pierwotny komentarz
+  w kodzie twierdził coś przeciwnego i był nieprawdą.
+* **Offsety odnoszą się do tekstu po normalizacji** i ten sam tekst pójdzie
+  do `dokument_tekst`. Gdyby w bazie leżał surowy, podświetlenie rozjeżdżałoby
+  się przy każdym przeniesieniu wyrazu.
+* **`6.960` czytamy po polsku jako 6960**, ale zapis jest oznaczany jako
+  niejednoznaczny i obniża pewność. Różnica między odczytem polskim
+  a angielskim to trzy rzędy wielkości na czynszu.
+
+### Czego ekstrakcja nie zrobi
+
+Kwoty, powierzchnie, daty i dni płatności — tak, z wysoką pewnością.
+**Zasady waloryzacji i zakres przeglądów — nie.** To zapisy opisowe,
+w każdej umowie sformułowane inaczej. Tam program pokaże znaleziony fragment
+i poprosi o decyzję. Zgadywanie przy waloryzacji kosztuje realne pieniądze,
+więc to ograniczenie jest zamierzone, nie tymczasowe.
+
+### Co blokuje
+
+**Nie wiadomo, czy umowy użytkownika to PDF-y z tekstem, czy skany.**
+Ze skanu bez OCR nie wyjdzie ani jedna liczba, a OCR to kilkaset megabajtów
+w instalatorze i osobny podetap (E9.7). Odpowiedź daje jedno uruchomienie
+`narzedzia/sprawdz-dokumenty.py` na prawdziwym archiwum — dopóki go nie ma,
+zakres E9.7 jest nierozstrzygnięty.
+
 ## Co następne
 
 **E9 i dalej** według planu budowy. Nic z tego nie jest już warunkiem, żeby
 system działał — od E8 zastępuje Excela.
+
+E9 ma już fundament, ale **nie jest podpięty do niczego**: `domena/ekstrakcja/`
+(wzorce dat, liczb i tekstu, czysta domena) oraz `dokumenty/tekst_z_pliku.py`
+(PDF i DOCX; OCR i stary `.doc` świadomie poza zakresem). Plan całości:
+[`docs/plan-e9-ekstrakcja.md`](plan-e9-ekstrakcja.md). API i interfejs jeszcze
+tego nie widzą — dopóki tak jest, program czyta o pliku tylko nazwę, sygnaturę
+i SHA-256, dokładnie jak opisuje zakładka „Jak to działa".
 
 Najpilniejsze z zaległości: **odpowiedź na punkt B** (EUR/NBP). Waloryzacja
 liczy już sumy osobno dla każdej waluty, ale waluta płatności odrębna
@@ -144,6 +211,26 @@ a nie w plikach programu.
 Świadome ograniczenia: aktualizator nie pobiera nic z internetu (dostaje plik),
 skrypty z `instalator\` nie aktualizują się same, a cofnięcie wersji cofa kod,
 nie bazę. Wszystkie trzy opisane w ADR 010 i `pulapki.md`.
+
+### Kopia zapasowa bez chmury
+
+Ustalone 28.08.2026: użytkowniczka **nie ma OneDrive** ani dysku sieciowego.
+Celem kopii zostaje pendrive zostawiony na stałe w porcie albo druga partycja.
+Chroni to przed awarią dysku i pomyłką, nie przed kradzieżą, pożarem ani
+ransomware — i tak trzeba to nazwać, zamiast udawać, że kopia jest zrobiona.
+
+Skutek: nie ma drugiego miejsca, w którym byłoby widać, że kopie przestały się
+wykonywać. Zadanie z Harmonogramu chodzi w ukrytym oknie, więc wyjęty pendrive
+zatrzymałby je bez śladu. Dlatego `kopia-zapasowa.ps1` zapisuje wynik **każdej**
+próby do `dane\stan-kopii.txt` — lokalnie, celowo nie w katalogu kopii, bo to
+właśnie tam nie da się nic zapisać w chwili awarii. `uruchom.ps1` czyta ten plik
+przy starcie i ostrzega, gdy ostatnia kopia się nie udała albo była dawniej niż
+trzy dni temu. Start programu to jedyny moment, w którym człowiek na pewno
+patrzy na ekran.
+
+Uszkodzony albo niekompletny plik stanu daje komunikat „nie umiem odczytać",
+a nie fałszywy alarm o awarii. Ostrzeżenie powtarzane codziennie bez powodu
+przestaje być czytane po tygodniu, a wtedy prawdziwe przepada razem z nim.
 
 ### Próba generalna przeszła i wyłapała cztery błędy
 
