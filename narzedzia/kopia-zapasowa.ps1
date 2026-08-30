@@ -28,8 +28,6 @@ $ErrorActionPreference = 'Stop'
 $SkryptBazy = Join-Path $PSScriptRoot 'lokalny-postgres.ps1'
 $IleZrzutowTrzymamy = 7
 
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-
 function Zapisz-Stan {
     <#
         Zapisuje wynik ostatniej proby LOKALNIE, w katalogu danych. Celowo nie
@@ -50,19 +48,6 @@ komunikat= $Komunikat
 "@
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $plik) | Out-Null
     Set-Content -LiteralPath $plik -Value $tresc -Encoding UTF8
-}
-
-function Czytaj-Env {
-    <# Prosty czytnik .env. Tyle wystarczy: to plik klucz=wartosc bez cudzyslowow. #>
-    $wynik = @{}
-    $plik = Plik-Env
-    if (-not (Test-Path -LiteralPath $plik)) { return $wynik }
-    foreach ($linia in (Get-Content -LiteralPath $plik -Encoding UTF8)) {
-        if ($linia -match '^\s*([A-Z_]+)\s*=\s*(.*)$') {
-            $wynik[$Matches[1]] = $Matches[2].Trim()
-        }
-    }
-    return $wynik
 }
 
 function Katalog-Skanu-Z-Bazy {

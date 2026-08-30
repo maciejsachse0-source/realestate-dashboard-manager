@@ -10,7 +10,7 @@
         katalogu "program". Binaria bazy i dane leza poza nim, wiec sie
         nie powtarzaja przy kazdym wydaniu.
 
-    PELNA (-Pelna) -- okolo 400 MB, robiona raz, wgrywana osobiscie.
+    PELNA (-Pelna) -- okolo 310 MB, robiona raz, wgrywana osobiscie.
         Dodatkowo binaria PostgreSQL, instalator i pliki .cmd korzenia.
 
     W obu przypadkach NIE pakujemy frontend/src ani node_modules: na
@@ -36,8 +36,6 @@ $ErrorActionPreference = 'Stop'
 $KatalogProgramu = Katalog-Programu
 $KatalogWydan = Join-Path $KatalogProgramu 'wydania'
 $Frontend = Join-Path $KatalogProgramu 'frontend'
-
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
 
 function Wersja-Projektu {
     $pyproject = Join-Path $KatalogProgramu 'backend\pyproject.toml'

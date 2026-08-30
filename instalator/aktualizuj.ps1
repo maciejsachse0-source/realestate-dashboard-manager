@@ -30,6 +30,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'wspolne.ps1')
 
 $Korzen = Split-Path -Parent $PSScriptRoot
 $KatalogProgramu = Join-Path $Korzen 'program'
@@ -41,18 +42,9 @@ $HistoriaWersji = Join-Path $KatalogDanych 'historia-wersji.txt'
 
 $Host.UI.RawUI.WindowTitle = 'Aktualizacja Systemu Najmu'
 
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-function Krok($numer, $tekst) { Write-Host "[$numer/6] $tekst" -ForegroundColor Cyan }
-
-function Zakoncz-Bledem($tekst) {
-    Pisz ''
-    Pisz "  NIE UDALO SIE: $tekst" 'Red'
-    Pisz ''
-    Pisz '  Program zostal bez zmian. Wyslij ten komunikat autorowi.' 'Yellow'
-    Pisz ''
-    Read-Host '  Nacisnij Enter, zeby zamknac'
-    exit 1
-}
+# Czyta to Zakoncz-Bledem z wspolne.ps1. Zdanie jest prawdziwe, bo wszystkie
+# wywolania tej funkcji stoja PRZED podmiana katalogow -- patrz krok [4/6].
+$DopisekBledu = 'Program zostal bez zmian. Wyslij ten komunikat autorowi.'
 
 function Wskaz-Paczke {
     <# Gdy nikt nie przeciagnal pliku na skrot, pytamy oknem wyboru. #>
@@ -62,14 +54,6 @@ function Wskaz-Paczke {
     $okno.Filter = 'Paczka programu (*.zip)|*.zip'
     if ($okno.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
     return $okno.FileName
-}
-
-function Czytaj-Wersje($katalog) {
-    $plik = Join-Path $katalog 'WERSJA.txt'
-    if (-not (Test-Path -LiteralPath $plik)) { return 'nieznana' }
-    $wiersz = Select-String -LiteralPath $plik -Pattern '^wersja\s*=\s*(.+)$' | Select-Object -First 1
-    if (-not $wiersz) { return 'nieznana' }
-    return $wiersz.Matches[0].Groups[1].Value.Trim()
 }
 
 Pisz ''

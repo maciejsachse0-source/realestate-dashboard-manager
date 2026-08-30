@@ -255,7 +255,7 @@ Odpowiedź daje E9.0, zanim cokolwiek zainstalujemy.
 |---|---|---|
 | Umowy mniej powtarzalne, niż zakładamy | wzorce trafiają w 30% | E9.3 na realnej umowie, zanim powstanie dziesięć wzorców |
 | Cicha pomyłka w kwocie | utrata zaufania, projekt umiera | D4 bez wyjątków; remis → `niejednoznaczna`; OCR nigdy z wysoką pewnością |
-| OCR wciąga 150 MB do paczki wydania | paczka pełna rośnie z 400 MB | OCR dopiero po dowodzie, że jest potrzebny (E9.0) |
+| OCR wciąga 150 MB do paczki wydania | paczka pełna rośnie z 310 MB | OCR dopiero po dowodzie, że jest potrzebny (E9.0) |
 | Wzorce rozpełzają się po `uslugi/` | nie da się ich testować bez bazy | `test_granice_warstw.py` łapie to automatycznie |
 | Ekstrakcja blokuje request przy 80-stronicowej umowie | interfejs staje | przebieg w tle na APScheduler, który już jest w projekcie |
 | Ponowna ekstrakcja dubluje propozycje | bałagan w historii | przebieg idempotentny po `(dokument_id, klucz)`; ruszamy tylko wiersze `zaproponowana` |

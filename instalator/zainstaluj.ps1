@@ -21,6 +21,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'wspolne.ps1')
 
 $Korzen = Split-Path -Parent $PSScriptRoot
 $KatalogProgramu = Join-Path $Korzen 'program'
@@ -29,17 +30,6 @@ $PlikEnv = Join-Path $KatalogDanych '.env'
 $SkryptBazy = Join-Path $KatalogProgramu 'narzedzia\lokalny-postgres.ps1'
 
 $Host.UI.RawUI.WindowTitle = 'Instalacja Systemu Najmu'
-
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-function Krok($numer, $tekst) { Write-Host "[$numer/6] $tekst" -ForegroundColor Cyan }
-
-function Zakoncz-Bledem($tekst) {
-    Pisz ''
-    Pisz "  NIE UDALO SIE: $tekst" 'Red'
-    Pisz ''
-    Read-Host '  Nacisnij Enter, zeby zamknac'
-    exit 1
-}
 
 Pisz ''
 Pisz '  Instalacja Systemu Najmu' 'White'

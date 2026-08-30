@@ -18,6 +18,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'wspolne.ps1')
 
 $Korzen = Split-Path -Parent $PSScriptRoot
 $KatalogProgramu = Join-Path $Korzen 'program'
@@ -27,16 +28,6 @@ $SkryptStopu = Join-Path $KatalogProgramu 'narzedzia\zatrzymaj.ps1'
 $HistoriaWersji = Join-Path $Korzen 'dane\historia-wersji.txt'
 
 $Host.UI.RawUI.WindowTitle = 'Cofniecie aktualizacji'
-
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-
-function Czytaj-Wersje($katalog) {
-    $plik = Join-Path $katalog 'WERSJA.txt'
-    if (-not (Test-Path -LiteralPath $plik)) { return 'nieznana' }
-    $wiersz = Select-String -LiteralPath $plik -Pattern '^wersja\s*=\s*(.+)$' | Select-Object -First 1
-    if (-not $wiersz) { return 'nieznana' }
-    return $wiersz.Matches[0].Groups[1].Value.Trim()
-}
 
 Pisz ''
 Pisz '  Cofniecie aktualizacji' 'White'

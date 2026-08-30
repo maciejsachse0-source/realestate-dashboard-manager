@@ -86,7 +86,7 @@ wysyła się mailem jako plik. Szczegóły i odrzucone warianty:
 ### Raz, przy zakładaniu
 
 ```powershell
-powershell -File narzedzia\spakuj-wydanie.ps1 -Pelna    # ~400 MB, z bazą w środku
+powershell -File narzedzia\spakuj-wydanie.ps1 -Pelna    # ~310 MB, z bazą w środku
 ```
 
 Paczkę rozpakowuje się na jej komputerze do `C:\SystemNajmu` i klika

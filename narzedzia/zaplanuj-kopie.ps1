@@ -24,8 +24,6 @@ $NazwaZadania = 'System Najmu - kopia zapasowa'
 $SkryptKopii = Join-Path $PSScriptRoot 'kopia-zapasowa.ps1'
 $Instalacja = Katalog-Instalacji
 
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-
 if (-not $Instalacja) {
     Pisz '      Pomijam zadanie kopii: to nie jest instalacja, tylko repozytorium.' 'DarkGray'
     exit 0

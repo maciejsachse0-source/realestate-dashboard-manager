@@ -81,6 +81,30 @@ dwie rzeczy, obie uruchamiane świadomie i osobno od serwera:
 
 Sam aktualizator nie wychodzi nigdzie — dostaje plik z dysku.
 
+### 6. Jedno powtórzenie kodu zamierzone, reszta usunięta
+
+Skrypty w `instalator/` **nie dołączają `narzedzia/sciezki.ps1`** i liczą ścieżki
+same, od własnego położenia. To wygląda na przeoczenie, a jest warunkiem
+działania: aktualizacja zmienia nazwę katalogu `program`, więc skrypt, który
+dołączyłby plik z jego wnętrza, wyciągałby sobie grunt spod nóg w połowie
+własnej pracy. To jedyne dozwolone powtórzenie wiedzy o układzie katalogów
+i jest opisane w obu miejscach — w `sciezki.ps1` i w `instalator/wspolne.ps1`.
+
+Powtórzenia, które nie miały takiego uzasadnienia, zniknęły:
+
+| Co się powtarzało | Gdzie | Gdzie mieszka teraz |
+|---|---|---|
+| czytnik `.env` (to samo wyrażenie regularne) | `kopia-zapasowa.ps1`, `diagnostyka.ps1` | `sciezki.ps1 / Czytaj-Env` |
+| `Pisz` (opakowanie na `Write-Host`) | pięć skryptów w `narzedzia\` | `sciezki.ps1` |
+| `Czytaj-Wersje` (co do znaku identyczne) | `aktualizuj.ps1`, `cofnij.ps1` | `instalator/wspolne.ps1` |
+| `Zakoncz-Bledem` | `aktualizuj.ps1`, `zainstaluj.ps1` | `instalator/wspolne.ps1` |
+
+Ostatnia pozycja zdążyła się już rozjechać: wersja w aktualizatorze dopisywała
+„program został bez zmian", wersja w instalatorze nie. Zdanie jest prawdziwe
+tylko dlatego, że **wszystkie** wywołania w aktualizatorze stoją przed podmianą
+katalogów. Po scaleniu ten warunek jest zapisany przy funkcji, a nie domyślny —
+bo pierwsze wywołanie dodane po podmianie zamieni komunikat w kłamstwo.
+
 ## Konsekwencje
 
 **Dobre.** Aktualizacja nie może skasować danych. Użytkownik nie potrzebuje
@@ -89,7 +113,9 @@ w `WERSJA.txt` i w `dane\historia-wersji.txt`, więc wiadomo, co gdzie stoi.
 
 **Kosztowne.** Skrypty w `instalator\` leżą poza katalogiem programu, bo zmieniają
 jego nazwę — **nie aktualizują się same**. Ich poprawka wymaga ręcznej podmiany.
-Dlatego mają być możliwie krótkie i rzadko ruszane.
+Dlatego mają być możliwie krótkie i rzadko ruszane. Dotyczy to również
+`instalator/wspolne.ps1`: przy ręcznej podmianie trzeba wysłać cały katalog,
+a nie pojedynczy plik, bo skrypty i ich wspólna część muszą do siebie pasować.
 
 **Nierozwiązane.** Migracja Alembica wykonana na danych użytkownika może wyłożyć
 się na czymś, czego nie ma w danych testowych. Zrzut przed aktualizacją ogranicza

@@ -362,6 +362,16 @@ Konsekwencja: paczka wydania **nie aktualizuje aktualizatora**. Poprawka w nim
 wymaga ręcznej podmiany pliku u użytkownika. To powód, żeby trzymać te skrypty
 krótkie — opisane w [ADR 010](decyzje/010-instalacja-u-uzytkownika-i-kanal-aktualizacji.md).
 
+### `instalator\` celowo nie dołącza `narzedzia\sciezki.ps1`
+Wygląda to na przeoczenie: cały projekt bierze ścieżki z jednego miejsca,
+a te trzy skrypty liczą je same. Powód jest twardy — `sciezki.ps1` leży
+w `program\`, a aktualizator w połowie pracy zmienia nazwę tego katalogu.
+Skrypt dołączający plik z jego wnętrza wyciągałby sobie grunt spod nóg.
+
+Wspólne kawałki tych trzech skryptów mieszkają w `instalator\wspolne.ps1`,
+który leży razem z nimi. Nie „naprawiaj" tego przez podpięcie `sciezki.ps1` —
+zepsuje się dopiero u użytkownika, w trakcie aktualizacji.
+
 ### Cofnięcie wersji nie cofa bazy
 `Cofnij aktualizacje.cmd` zamienia katalogi z kodem. Struktura bazy zostaje ta,
 którą zrobiła z niej migracja. W tym projekcie migracje są dokładające (nic nie

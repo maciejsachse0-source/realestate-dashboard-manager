@@ -29,8 +29,6 @@ $ErrorActionPreference = 'Stop'
 $KatalogProgramu = Katalog-Programu
 $KatalogDanych = Katalog-Danych
 
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-
 Pisz ''
 Pisz '  Diagnostyka Systemu Najmu' 'White'
 Pisz '  -------------------------' 'DarkGray'
@@ -62,11 +60,10 @@ try {
     $raport.Add('--- USTAWIENIA (bez wartosci) ---')
     $plikEnv = Plik-Env
     if (Test-Path -LiteralPath $plikEnv) {
-        foreach ($linia in (Get-Content -LiteralPath $plikEnv -Encoding UTF8)) {
-            if ($linia -match '^\s*([A-Z_]+)\s*=\s*(.*)$') {
-                $stan = if ([string]::IsNullOrWhiteSpace($Matches[2])) { 'puste' } else { 'ustawione' }
-                $raport.Add("$($Matches[1]) = $stan")
-            }
+        $ustawienia = Czytaj-Env
+        foreach ($klucz in ($ustawienia.Keys | Sort-Object)) {
+            $stan = if ([string]::IsNullOrWhiteSpace($ustawienia[$klucz])) { 'puste' } else { 'ustawione' }
+            $raport.Add("$klucz = $stan")
         }
     }
     else { $raport.Add("brak pliku: $plikEnv") }

@@ -23,7 +23,7 @@ Plan budowy z etapami i definicjami ukończenia: `docs/plan-budowy-claude-code.m
 - Frontend dev: `cd frontend && npm run dev` (port 5180, proxy /api na 8010)
 - Testy frontend: `cd frontend && npm test`
 - Paczka wydania: `powershell -File narzedzia/spakuj-wydanie.ps1` (aktualizacja,
-  ~0,4 MB) albo z `-Pelna` (pierwsza instalacja, ~400 MB)
+  ~0,4 MB) albo z `-Pelna` (pierwsza instalacja, ~310 MB)
 - Kopia zapasowa: `powershell -File narzedzia/kopia-zapasowa.ps1`
 
 Skrót sam przebudowuje interfejs, gdy cokolwiek w `frontend/src` jest nowsze
@@ -38,12 +38,15 @@ niż `frontend/dist/index.html`. Wymuszenie: `narzedzia/uruchom.ps1 -PrzebudujIn
 - Warstwy: `api` → `uslugi` → `repozytoria` → `modele`. Nigdy w drugą stronę.
 - Frontend nie liczy niczego na pieniądzach. Wszystkie wyliczenia po stronie API.
 - Formatowanie w interfejsie tylko przez `frontend/src/funkcje/format.ts`.
-- Ścieżki do bazy, katalogu danych i `.env` bierz **wyłącznie** z
-  `narzedzia/sciezki.ps1` (PowerShell) i ze zmiennej `NAJEM_PLIK_ENV` (Python).
-  U użytkownika program i dane leżą w rozłącznych katalogach, żeby aktualizacja
-  „podmień katalog" nie kasowała bazy
+- Ścieżki do bazy, katalogu danych i `.env` bierz z `narzedzia/sciezki.ps1`
+  (PowerShell) i ze zmiennej `NAJEM_PLIK_ENV` (Python). U użytkownika program
+  i dane leżą w rozłącznych katalogach, żeby aktualizacja „podmień katalog"
+  nie kasowała bazy
   ([ADR 010](docs/decyzje/010-instalacja-u-uzytkownika-i-kanal-aktualizacji.md)).
   Nieustawione `NAJEM_KATALOG_INSTALACJI` = dzisiejsze ścieżki repozytorium.
+  **Jedyny wyjątek:** skrypty w `instalator/` liczą ścieżki same, bo zmieniają
+  nazwę katalogu `program`, w którym `sciezki.ps1` leży. Mają własny
+  `instalator/wspolne.ps1` i nie wolno im dołączać niczego z `program\`.
 - Zbudowany interfejs serwuje `InterfejsSPA` w `main.py`. Nieznany adres ekranu
   dostaje `index.html` (bez tego odświeżenie podstrony daje 404), a `index.html`
   idzie z `Cache-Control: no-cache`. Nie zamieniaj tego na zwykłe `StaticFiles` —

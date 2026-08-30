@@ -55,8 +55,6 @@ $Baza  = 'najem'
 $BazaTestowa = 'najem_testy'
 $HasloSuper = 'postgres-lokalnie'
 
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
-
 function Sprawdz-Binaria {
     if (-not (Test-Path (Join-Path $BinPg 'pg_ctl.exe'))) {
         throw "Brak binariow PostgreSQL. Uruchom najpierw: lokalny-postgres.ps1 setup"

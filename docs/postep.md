@@ -196,7 +196,7 @@ i aktualizator nie ma jak go dotknąć. Przełącznikiem jest jedna zmienna
 `NAJEM_KATALOG_INSTALACJI`, czytana wyłącznie w `narzedzia/sciezki.ps1`;
 nieustawiona = dzisiejsze ścieżki repozytorium, bez żadnej różnicy w pracy autora.
 
-Doszły: `spakuj-wydanie.ps1` (dwa rodzaje paczek — pełna ~400 MB i aktualizacja
+Doszły: `spakuj-wydanie.ps1` (dwa rodzaje paczek — pełna ~310 MB i aktualizacja
 ~0,4 MB), `instalator/` z zakładaniem, aktualizacją i cofaniem wersji,
 `kopia-zapasowa.ps1` z zadaniem w Harmonogramie oraz `diagnostyka.ps1`.
 Uruchomienie nie wymaga już Node.js, gdy interfejs jest zbudowany — a w paczce
