@@ -1,15 +1,15 @@
-import { type ReactNode, useState } from 'react'
-import { BladApi } from '@/api/klient'
-import { Button } from '@/components/ui/button'
+import { type ReactNode, useState } from "react";
+import { BladApi } from "@/api/klient";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /**
  * Wspólna oprawa formularza w oknie modalnym.
@@ -25,27 +25,27 @@ export function DialogFormularza({
   opis,
   onZapisz,
   zapisywanie,
-  etykietaZapisu = 'Zapisz',
+  etykietaZapisu = "Zapisz",
   children,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  tytul: string
-  opis?: string
-  onZapisz: () => Promise<unknown>
-  zapisywanie: boolean
-  etykietaZapisu?: string
-  children: ReactNode
+  otwarty: boolean;
+  onZamknij: () => void;
+  tytul: string;
+  opis?: string;
+  onZapisz: () => Promise<unknown>;
+  zapisywanie: boolean;
+  etykietaZapisu?: string;
+  children: ReactNode;
 }) {
-  const [blad, setBlad] = useState<string | null>(null)
+  const [blad, setBlad] = useState<string | null>(null);
 
   return (
     <Dialog
       open={otwarty}
       onOpenChange={(otwarte) => {
         if (!otwarte) {
-          setBlad(null)
-          onZamknij()
+          setBlad(null);
+          onZamknij();
         }
       }}
     >
@@ -58,13 +58,15 @@ export function DialogFormularza({
         <form
           className="space-y-4"
           onSubmit={async (zdarzenie) => {
-            zdarzenie.preventDefault()
-            setBlad(null)
+            zdarzenie.preventDefault();
+            setBlad(null);
             try {
-              await onZapisz()
-              onZamknij()
+              await onZapisz();
+              onZamknij();
             } catch (e) {
-              setBlad(e instanceof BladApi ? e.message : 'Nie udało się zapisać.')
+              setBlad(
+                e instanceof BladApi ? e.message : "Nie udało się zapisać.",
+              );
             }
           }}
         >
@@ -84,13 +86,13 @@ export function DialogFormularza({
               Anuluj
             </Button>
             <Button type="submit" disabled={zapisywanie}>
-              {zapisywanie ? 'Zapisuję…' : etykietaZapisu}
+              {zapisywanie ? "Zapisuję…" : etykietaZapisu}
             </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 /** Pole tekstowe z etykietą i opcjonalną podpowiedzią. */
@@ -99,19 +101,22 @@ export function PoleTekstowe({
   etykieta,
   wartosc,
   onZmiana,
-  typ = 'text',
+  typ = "text",
   wymagane = false,
   podpowiedz,
   ...reszta
 }: {
-  nazwa: string
-  etykieta: string
-  wartosc: string
-  onZmiana: (wartosc: string) => void
-  typ?: string
-  wymagane?: boolean
-  podpowiedz?: string
-} & Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange' | 'name' | 'type'>) {
+  nazwa: string;
+  etykieta: string;
+  wartosc: string;
+  onZmiana: (wartosc: string) => void;
+  typ?: string;
+  wymagane?: boolean;
+  podpowiedz?: string;
+} & Omit<
+  React.ComponentProps<typeof Input>,
+  "value" | "onChange" | "name" | "type"
+>) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={nazwa}>
@@ -127,9 +132,11 @@ export function PoleTekstowe({
         onChange={(e) => onZmiana(e.target.value)}
         {...reszta}
       />
-      {podpowiedz && <p className="text-xs text-muted-foreground">{podpowiedz}</p>}
+      {podpowiedz && (
+        <p className="text-xs text-muted-foreground">{podpowiedz}</p>
+      )}
     </div>
-  )
+  );
 }
 
 /** Lista wyboru. Pusta wartość znaczy „nie wybrano", a nie „pierwsza opcja". */
@@ -140,17 +147,17 @@ export function PoleWyboru({
   onZmiana,
   opcje,
   wymagane = false,
-  pusteEtykieta = '— wybierz —',
+  pusteEtykieta = "— wybierz —",
   podpowiedz,
 }: {
-  nazwa: string
-  etykieta: string
-  wartosc: string
-  onZmiana: (wartosc: string) => void
-  opcje: { wartosc: string; etykieta: string }[]
-  wymagane?: boolean
-  pusteEtykieta?: string
-  podpowiedz?: string
+  nazwa: string;
+  etykieta: string;
+  wartosc: string;
+  onZmiana: (wartosc: string) => void;
+  opcje: { wartosc: string; etykieta: string }[];
+  wymagane?: boolean;
+  pusteEtykieta?: string;
+  podpowiedz?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -173,9 +180,11 @@ export function PoleWyboru({
           </option>
         ))}
       </select>
-      {podpowiedz && <p className="text-xs text-muted-foreground">{podpowiedz}</p>}
+      {podpowiedz && (
+        <p className="text-xs text-muted-foreground">{podpowiedz}</p>
+      )}
     </div>
-  )
+  );
 }
 
 export function PoleZaznaczenia({
@@ -185,11 +194,11 @@ export function PoleZaznaczenia({
   onZmiana,
   podpowiedz,
 }: {
-  nazwa: string
-  etykieta: string
-  wartosc: boolean
-  onZmiana: (wartosc: boolean) => void
-  podpowiedz?: string
+  nazwa: string;
+  etykieta: string;
+  wartosc: boolean;
+  onZmiana: (wartosc: boolean) => void;
+  podpowiedz?: string;
 }) {
   return (
     <div className="space-y-1">
@@ -204,21 +213,23 @@ export function PoleZaznaczenia({
         />
         {etykieta}
       </label>
-      {podpowiedz && <p className="text-xs text-muted-foreground">{podpowiedz}</p>}
+      {podpowiedz && (
+        <p className="text-xs text-muted-foreground">{podpowiedz}</p>
+      )}
     </div>
-  )
+  );
 }
 
 /** Zamienia pusty tekst na null. API odróżnia „nie podano" od pustego napisu. */
 export function pustyNaNull(wartosc: string): string | null {
-  const przycięty = wartosc.trim()
-  return przycięty === '' ? null : przycięty
+  const przycięty = wartosc.trim();
+  return przycięty === "" ? null : przycięty;
 }
 
 /** Liczba albo null. Pusty tekst nie może stać się zerem (decyzja D5). */
 export function liczbaLubNull(wartosc: string): number | null {
-  const przycięty = wartosc.trim()
-  if (przycięty === '') return null
-  const liczba = Number(przycięty)
-  return Number.isFinite(liczba) ? liczba : null
+  const przycięty = wartosc.trim();
+  if (przycięty === "") return null;
+  const liczba = Number(przycięty);
+  return Number.isFinite(liczba) ? liczba : null;
 }

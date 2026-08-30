@@ -13,7 +13,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$KatalogRepo = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'sciezki.ps1')
+
+$KatalogRepo = Katalog-Programu
 $SkryptBazy = Join-Path $PSScriptRoot 'lokalny-postgres.ps1'
 $SkryptStopu = Join-Path $PSScriptRoot 'zatrzymaj.ps1'
 $Backend = Join-Path $KatalogRepo 'backend'
@@ -22,10 +24,81 @@ $Adres = 'http://127.0.0.1:8010'
 #: Ustawiane, gdy program juz dzialal i baza nalezy do tamtego uruchomienia.
 $ZostawBaze = $false
 
+#: Konfiguracja nalezy do danych, nie do programu. W repozytorium wychodzi
+#: z tego <repo>\.env, czyli to samo co zawsze.
+$env:NAJEM_PLIK_ENV = Plik-Env
+
 $Host.UI.RawUI.WindowTitle = 'System Zarzadzania Umowami Najmu'
 
 function Krok($numer, $tekst) { Write-Host "[$numer/5] $tekst" -ForegroundColor Cyan }
 function Blad($tekst) { Write-Host "`n  BLAD: $tekst`n" -ForegroundColor Red }
+
+function Ostrzez-O-Kopii {
+    <#
+    .SYNOPSIS
+        Krzyczy przy starcie, gdy kopii zapasowej dawno nie bylo.
+
+    .DESCRIPTION
+        Zadanie kopii chodzi z Harmonogramu w UKRYTYM oknie. Gdy dysk kopii
+        zniknie -- pendrive wyjety z portu, zmieniona litera dysku -- kopie
+        przestana sie robic i nikt sie o tym nie dowie. Bez chmury nie ma
+        drugiego miejsca, wiec jedyna ochrona jest to, ze czlowiek to zobaczy.
+
+        Start programu to jedyny moment, w ktorym on na pewno patrzy na ekran.
+    #>
+    param([int]$IleDniToDuzo = 3)
+
+    if (-not (Katalog-Instalacji)) { return }
+
+    $plik = Join-Path (Katalog-Danych) 'stan-kopii.txt'
+    if (-not (Test-Path -LiteralPath $plik)) {
+        Write-Host ''
+        Write-Host '  UWAGA: kopia zapasowa nie wykonala sie ani razu.' -ForegroundColor Yellow
+        Write-Host '  Awaria dysku skasowalaby baze i dokumenty naraz.' -ForegroundColor DarkGray
+        Write-Host ''
+        return
+    }
+
+    # Kazde pole czytamy osobno i ostroznie. Uciety albo recznie zepsuty plik
+    # nie moze wywrocic startu programu ani -- co gorsza -- udawac awarii
+    # kopii, ktorej nie bylo.
+    $tresc = @(Get-Content -LiteralPath $plik -Encoding UTF8 -ErrorAction SilentlyContinue)
+
+    function Pole($nazwa) {
+        $trafienie = $tresc | Select-String "^$nazwa\s*=\s*(.+)$" | Select-Object -First 1
+        if ($trafienie) { return $trafienie.Matches[0].Groups[1].Value.Trim() }
+        return ''
+    }
+
+    $data = Pole 'data'
+    $wynik = Pole 'wynik'
+
+    $kiedy = [datetime]::MinValue
+    $dataCzytelna = [datetime]::TryParse($data, [ref]$kiedy)
+
+    if (-not $dataCzytelna -or -not $wynik) {
+        Write-Host ''
+        Write-Host '  UWAGA: nie umiem odczytac stanu kopii zapasowej.' -ForegroundColor Yellow
+        Write-Host "  Zajrzyj do: $plik" -ForegroundColor DarkGray
+        Write-Host ''
+        return
+    }
+
+    $dni = [int]((Get-Date) - $kiedy).TotalDays
+
+    if ($wynik -ne 'OK') {
+        Write-Host ''
+        Write-Host "  UWAGA: ostatnia kopia zapasowa ($data) NIE UDALA SIE." -ForegroundColor Red
+        Write-Host '  Sprawdz, czy dysk na kopie jest podlaczony.' -ForegroundColor Yellow
+        Write-Host ''
+    }
+    elseif ($dni -gt $IleDniToDuzo) {
+        Write-Host ''
+        Write-Host "  UWAGA: ostatnia kopia zapasowa byla $dni dni temu ($data)." -ForegroundColor Yellow
+        Write-Host '  Sprawdz, czy dysk na kopie jest podlaczony.' -ForegroundColor DarkGray
+        Write-Host ''
+    }
+}
 
 function Powod-Przebudowy {
     <#
@@ -75,6 +148,24 @@ function Powod-Przebudowy {
     return ''
 }
 
+# U uzytkownika nikt nie zajrzy przez ramie w okno programu, a komunikat
+# o bledzie znika razem z nim. Transcript zapisuje cala sesje, razem z tym,
+# co wypisuje uvicorn, i nie wymaga przekierowania strumieni: "2>&1"
+# w PowerShell 5.1 opakowuje kazda linie stderr w ErrorRecord i przerywa
+# skrypt. W repozytorium nie zapisujemy nic -- tam log jest na ekranie.
+$Transkrypcja = $false
+if (Katalog-Instalacji) {
+    $katalogLogow = Katalog-Logow
+    New-Item -ItemType Directory -Force -Path $katalogLogow | Out-Null
+    Get-ChildItem -Path $katalogLogow -Filter 'aplikacja-*.log' -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -Skip 14 |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    $plikLogu = Join-Path $katalogLogow "aplikacja-$(Get-Date -Format 'yyyy-MM-dd').log"
+    Start-Transcript -Path $plikLogu -Append -ErrorAction SilentlyContinue | Out-Null
+    $Transkrypcja = $?
+}
+
 Write-Host ''
 Write-Host '  System Zarzadzania Umowami Najmu' -ForegroundColor White
 Write-Host '  --------------------------------' -ForegroundColor DarkGray
@@ -83,12 +174,15 @@ Write-Host ''
 try {
     # ---------------------------------------------------------------- 1. narzedzia
     Krok 1 'Sprawdzam srodowisko...'
-    foreach ($program in @('uv', 'npm')) {
-        if (-not (Get-Command $program -ErrorAction SilentlyContinue)) {
-            Blad "Brakuje programu '$program'. Zajrzyj do README.md, sekcja 'Instalacja od zera'."
-            Read-Host 'Nacisnij Enter, zeby zamknac'
-            exit 1
-        }
+    # Tylko uv. Node.js sprawdzamy dopiero w kroku 4 i wylacznie wtedy, gdy
+    # naprawde trzeba budowac interfejs. Paczka wydania niesie gotowy
+    # frontend/dist bez zrodel, wiec na komputerze uzytkownika Node nie jest
+    # do niczego potrzebny -- a wymaganie go tutaj zatrzymywalo caly program
+    # na pierwszym kroku, zanim cokolwiek zdazylo wstac.
+    if (-not (Get-Command 'uv' -ErrorAction SilentlyContinue)) {
+        Blad "Brakuje programu 'uv'. Zajrzyj do README.md, sekcja 'Instalacja od zera'."
+        Read-Host 'Nacisnij Enter, zeby zamknac'
+        exit 1
     }
 
     # ---------------------------------------------------------------- 2. baza
@@ -118,6 +212,19 @@ try {
 
     if ($powodBudowy) {
         Write-Host "      $powodBudowy" -ForegroundColor DarkGray
+
+        if (-not (Get-Command 'npm' -ErrorAction SilentlyContinue)) {
+            Blad @'
+Trzeba zbudowac interfejs, ale brakuje programu Node.js (npm).
+To nie powinno zdarzyc sie na komputerze uzytkownika: paczka wydania
+niesie gotowy interfejs. Jesli widzisz to u siebie, zainstaluj Node.js
+(README.md, sekcja "Instalacja od zera"). Jesli u uzytkownika --
+paczka zostala zlozona blednie i trzeba wydac ja od nowa.
+'@
+            Read-Host 'Nacisnij Enter, zeby zamknac'
+            exit 1
+        }
+
         Push-Location $Frontend
         try {
             if (-not (Test-Path 'node_modules')) {
@@ -143,6 +250,7 @@ try {
 
     # ---------------------------------------------------------------- 5. aplikacja
     Krok 5 'Startuje aplikacje...'
+    Ostrzez-O-Kopii
 
     # Zajety port 8010 prawie zawsze znaczy, ze program juz raz uruchomiono
     # i nadal dziala. Uvicorn wypisalby wtedy blad WinError 10048, ktory nikomu
@@ -219,4 +327,5 @@ finally {
         & powershell -ExecutionPolicy Bypass -File $SkryptBazy stop | Out-Null
         Write-Host '  System zatrzymany.' -ForegroundColor DarkGray
     }
+    if ($Transkrypcja) { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null }
 }

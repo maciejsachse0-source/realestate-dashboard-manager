@@ -47,8 +47,11 @@ niż `frontend/dist/index.html`. Wymuszenie: `narzedzia/uruchom.ps1 -PrzebudujIn
 - Każda kwota ma jawnie: netto czy brutto, stawkę VAT i walutę.
 - Daty biznesowe: `date`. Znaczniki techniczne: `datetime` w UTC (`TIMESTAMPTZ`).
   Konwersja na Europe/Warsaw dopiero w warstwie prezentacji.
-- Nic nie usuwamy fizycznie. Soft delete (`usunieto_dnia`, `usunal_uzytkownik_id`)
-  plus wpis w `audit_log`, który jest tylko do zapisu.
+- Nic nie usuwamy fizycznie. Soft delete (`usunieto_dnia`) plus wpis
+  w `audit_log`, który jest tylko do zapisu.
+- Program **nie ma logowania ani pojęcia użytkownika** ([ADR 009](docs/decyzje/009-usuniecie-logowania.md)).
+  Nie ma sesji, ról ani kolumn z autorem operacji. Audyt zapisuje co, kiedy
+  i z jakiej wartości na jaką — nie kto. Nie dodawaj sprawdzeń uprawnień.
 - Każda zmiana modelu = migracja Alembic w tym samym commicie.
 - Parametry umowy nie są nadpisywane, tylko wersjonowane w czasie
   (tabela `parametr_wartosc`, pola `obowiazuje_od` / `obowiazuje_do`).
@@ -58,7 +61,10 @@ niż `frontend/dist/index.html`. Wymuszenie: `narzedzia/uruchom.ps1 -PrzebudujIn
 - Brak danych to informacja, nie pusta komórka (decyzja D5). Nigdy nie podstawiaj
   zera ani wartości domyślnej za brakującą daną.
 - Dokument wczytany z dysku (`przechowywanie = link`) **nie jest kopiowany**.
-  W bazie leży ścieżka względna wobec `KATALOG_SKANU`, SHA-256 i rozmiar.
+  W bazie leży ścieżka względna wobec katalogu skanu, SHA-256 i rozmiar.
+  Sam katalog ustawia się na ekranie „Dokumenty z dysku" (tabela
+  `ustawienie_systemu`); `KATALOG_SKANU` z `.env` jest tylko wartością
+  zapasową, gdy w bazie nic nie ma. Baza wygrywa z plikiem.
   Skutek operacyjny: kopia zapasowa musi obejmować bazę **razem** z tym
   katalogiem. Decyzja i odrzucone warianty: `docs/decyzje/008-dokumenty-linkowane-nie-kopiowane.md`.
 - Oznaczeń lokali nie parsujemy z nazw folderów. Są nieregularne, a cicha

@@ -4,13 +4,11 @@ Najemca to tor B z decyzji D3: dane poufne wprowadzane recznie w programie,
 nigdy nie przechodzace przez ekstrakcje z dokumentu.
 """
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    DateTime,
     ForeignKey,
     Index,
     String,
@@ -20,47 +18,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from najem.baza import Baza
-from najem.domena.slowniki import RolaUzytkownika
 from najem.modele.wspolne import (
     KluczGlowny,
     MiekkieUsuwanie,
     Wersjonowanie,
     ZnacznikiCzasu,
-    slownik,
 )
 
 if TYPE_CHECKING:
     from najem.modele.najem import OkresNajmu
-
-
-class Uzytkownik(Baza, ZnacznikiCzasu, Wersjonowanie):
-    """Logowanie imienne, bez kont wspoldzielonych (koncepcja, sekcja 8.1 punkt 5).
-
-    Uwierzytelnianie wchodzi w etapie E4. Tu jest sam nosnik danych.
-    """
-
-    __tablename__ = "uzytkownik"
-
-    id: Mapped[KluczGlowny]
-    login: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    imie_nazwisko: Mapped[str] = mapped_column(String(160), nullable=False)
-    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
-    hash_hasla: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    rola: Mapped[RolaUzytkownika] = mapped_column(slownik(RolaUzytkownika), nullable=False)
-    aktywny: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
-
-    # Wymuszona zmiana hasla przy pierwszym logowaniu (plan, sekcja 1.2 punkt K).
-    wymaga_zmiany_hasla: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    nieudane_logowania: Mapped[int] = mapped_column(nullable=False, server_default="0")
-    zablokowany_do: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    ostatnie_logowanie: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    def __repr__(self) -> str:
-        return f"<Uzytkownik {self.login} ({self.rola})>"
 
 
 class Najemca(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):

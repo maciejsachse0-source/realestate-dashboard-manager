@@ -32,7 +32,6 @@ from najem.modele import (
     Najemca,
     OkresNajmu,
     ParametrWartosc,
-    Uzytkownik,
     Zabezpieczenie,
     Zdarzenie,
 )
@@ -57,7 +56,7 @@ def _okres(sesja: Session, lokal: Lokal, najemca: Najemca) -> OkresNajmu:
 
 class TestTworzenieEncji:
     def test_pelna_sciezka_od_budynku_do_parametru(
-        self, sesja: Session, lokal: Lokal, najemca: Najemca, uzytkownik: Uzytkownik
+        self, sesja: Session, lokal: Lokal, najemca: Najemca
     ) -> None:
         okres = _okres(sesja, lokal, najemca)
 
@@ -84,7 +83,6 @@ class TestTworzenieEncji:
             zrodlo_strona=3,
             zrodlo_paragraf="par. 5 ust. 1",
             status_weryfikacji=StatusWeryfikacji.ZATWIERDZONA,
-            zatwierdzil_uzytkownik_id=uzytkownik.id,
             zatwierdzono_dnia=datetime.now(UTC),
         )
         sesja.add(parametr)
@@ -174,11 +172,10 @@ class TestUnikalnosc:
 
 class TestMiekkieUsuwanie:
     def test_po_usunieciu_mozna_zalozyc_lokal_o_tym_samym_oznaczeniu(
-        self, sesja: Session, budynek: Budynek, lokal: Lokal, uzytkownik: Uzytkownik
+        self, sesja: Session, budynek: Budynek, lokal: Lokal
     ) -> None:
         """Indeks unikalny jest czesciowy, wiec usuniety rekord nie blokuje nowego."""
         lokal.usunieto_dnia = datetime.now(UTC)
-        lokal.usunal_uzytkownik_id = uzytkownik.id
         sesja.flush()
 
         sesja.add(Lokal(budynek_id=budynek.id, oznaczenie="18A/12", typ=TypLokalu.BIUROWY))
@@ -340,25 +337,6 @@ class TestOgraniczeniaWartosci:
         with pytest.raises(IntegrityError):
             sesja.flush()
 
-    def test_zatwierdzenie_bez_daty_jest_odrzucane(
-        self, sesja: Session, lokal: Lokal, najemca: Najemca, uzytkownik: Uzytkownik
-    ) -> None:
-        """Slad audytowy jest para: kto i kiedy. Polowiczny slad nie jest sladem."""
-        okres = _okres(sesja, lokal, najemca)
-        sesja.add(
-            ParametrWartosc(
-                okres_najmu_id=okres.id,
-                klucz="powierzchnia",
-                typ_wartosci=TypWartosci.LICZBA,
-                wartosc_liczba=Decimal("100"),
-                obowiazuje_od=date(2026, 2, 1),
-                status_weryfikacji=StatusWeryfikacji.ZATWIERDZONA,
-                zatwierdzil_uzytkownik_id=uzytkownik.id,
-            )
-        )
-        with pytest.raises(IntegrityError):
-            sesja.flush()
-
     def test_zabezpieczenie_netto_wymaga_vat(
         self, sesja: Session, lokal: Lokal, najemca: Najemca
     ) -> None:
@@ -398,10 +376,9 @@ class TestOgraniczeniaWartosci:
 
 
 class TestLogAudytu:
-    def test_wpis_da_sie_dodac(self, sesja: Session, uzytkownik: Uzytkownik) -> None:
+    def test_wpis_da_sie_dodac(self, sesja: Session) -> None:
         sesja.add(
             LogAudytu(
-                uzytkownik_id=uzytkownik.id,
                 operacja=OperacjaAudytu.ZMIANA,
                 tabela="budynek",
                 rekord_id=1,

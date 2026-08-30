@@ -44,9 +44,6 @@ class PowiazanieFolderu(Baza, ZnacznikiCzasu, MiekkieUsuwanie):
     okres_najmu_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("okres_najmu.id", ondelete="RESTRICT"), nullable=False
     )
-    powiazal_uzytkownik_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("uzytkownik.id", ondelete="RESTRICT"), nullable=True
-    )
     uwagi: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     okres_najmu: Mapped["OkresNajmu"] = relationship()
@@ -84,10 +81,6 @@ class PominietyPlik(Baza, ZnacznikiCzasu, MiekkieUsuwanie):
     nazwa_pliku: Mapped[str | None] = mapped_column(String(300), nullable=True)
     sciezka_wzgledna: Mapped[str | None] = mapped_column(String(500), nullable=True)
     powod: Mapped[str | None] = mapped_column(Text, nullable=True)
-    pominal_uzytkownik_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("uzytkownik.id", ondelete="RESTRICT"), nullable=True
-    )
-
     __table_args__ = (
         CheckConstraint("char_length(hash_sha256) = 64", name="ck_pominiety_dlugosc_hasha"),
         Index(

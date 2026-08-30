@@ -11,7 +11,6 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field
 
-from najem.auth.zaleznosci import Zarzadca
 from najem.baza import SesjaBazy
 from najem.dokumenty.arkusz import (
     WIERSZE_PODGLADU,
@@ -112,7 +111,6 @@ def _na_slowniki(
 @router.post("/podglad", response_model=PodgladArkusza, summary="Krok 1: co jest w pliku")
 async def podglad(
     baza: SesjaBazy,
-    _: Zarzadca,
     plik: Annotated[UploadFile, File(description="Arkusz XLSX")],
     mapowanie: Annotated[str, Form(description='JSON: {"Nazwa kolumny": "pole_systemu"}')] = "{}",
     nazwa_arkusza: Annotated[str | None, Form()] = None,
@@ -152,7 +150,6 @@ async def podglad(
 @router.post("/wykonaj", response_model=WynikImportuWyjscie, summary="Krok 2: zapisz")
 async def wykonaj(
     baza: SesjaBazy,
-    kto: Zarzadca,
     request: Request,
     plik: Annotated[UploadFile, File(description="Arkusz XLSX")],
     mapowanie: Annotated[str, Form(description='JSON: {"Nazwa kolumny": "pole_systemu"}')],
@@ -179,7 +176,6 @@ async def wykonaj(
             baza,
             sprawdzenie.wiersze,
             sprawdzenie.bledy,
-            uzytkownik_id=kto.uzytkownik.id,
         )
     except ImportPrzerwany as blad:
         # Rollback jest jawny, żeby nie zależeć od tego, co zrobi zależność sesji.

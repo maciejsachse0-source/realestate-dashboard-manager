@@ -26,6 +26,9 @@ pgdata/
 dane/dokumenty/
 dane/kopie/
 
+# Paczki wydan i katalogi robocze pakowania (buduje je narzedzia/spakuj-wydanie.ps1)
+wydania/
+
 # System
 Thumbs.db
 desktop.ini

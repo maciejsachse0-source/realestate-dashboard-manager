@@ -8,7 +8,7 @@
  * wyswietlaja to, co przyszlo z API.
  */
 
-const LOCALE = 'pl-PL'
+const LOCALE = "pl-PL";
 
 /**
  * useGrouping: 'always' jest konieczne.
@@ -16,30 +16,33 @@ const LOCALE = 'pl-PL'
  * bez spacji, a dopiero 12 345,67 zl ja dostaje. Plan (sekcja 1.2 punkt J)
  * wymaga separatora tysiecy zawsze, takze przy czterech cyfrach.
  */
-const GRUPOWANIE = { useGrouping: 'always' } as const
+const GRUPOWANIE = { useGrouping: "always" } as const;
 
 /** Kwota jako tekst, np. "1 234,56 zl". Wejscie to string z API (Decimal), nie number. */
-export function formatujKwote(wartosc: string | number, waluta = 'PLN'): string {
-  const liczba = typeof wartosc === 'string' ? Number(wartosc) : wartosc
-  if (!Number.isFinite(liczba)) return '—'
+export function formatujKwote(
+  wartosc: string | number,
+  waluta = "PLN",
+): string {
+  const liczba = typeof wartosc === "string" ? Number(wartosc) : wartosc;
+  if (!Number.isFinite(liczba)) return "—";
   return new Intl.NumberFormat(LOCALE, {
-    style: 'currency',
+    style: "currency",
     currency: waluta,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     ...GRUPOWANIE,
-  }).format(liczba)
+  }).format(liczba);
 }
 
 /** Powierzchnia w metrach kwadratowych, np. "128,50 m²". */
 export function formatujPowierzchnie(m2: string | number): string {
-  const liczba = typeof m2 === 'string' ? Number(m2) : m2
-  if (!Number.isFinite(liczba)) return '—'
+  const liczba = typeof m2 === "string" ? Number(m2) : m2;
+  if (!Number.isFinite(liczba)) return "—";
   return `${new Intl.NumberFormat(LOCALE, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     ...GRUPOWANIE,
-  }).format(liczba)} m²`
+  }).format(liczba)} m²`;
 }
 
 /**
@@ -50,11 +53,11 @@ export function formatujPowierzchnie(m2: string | number): string {
  * To jest ten blad o jeden dzien z sekcji 1.1 punkt D planu.
  */
 export function formatujDate(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const dopasowanie = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  if (!dopasowanie) return '—'
-  const [, rok, miesiac, dzien] = dopasowanie
-  return `${dzien}.${miesiac}.${rok}`
+  if (!iso) return "—";
+  const dopasowanie = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!dopasowanie) return "—";
+  const [, rok, miesiac, dzien] = dopasowanie;
+  return `${dzien}.${miesiac}.${rok}`;
 }
 
 /**
@@ -64,26 +67,29 @@ export function formatujDate(iso: string | null | undefined): string {
  * "+-250,00 zl". Wskaznik ujemny jest dopuszczalny, wiec ten przypadek
  * nie jest teoretyczny.
  */
-export function formatujRoznice(wartosc: string | number, waluta = 'PLN'): string {
-  const liczba = typeof wartosc === 'string' ? Number(wartosc) : wartosc
-  if (!Number.isFinite(liczba)) return BRAK_DANYCH
-  const tekst = formatujKwote(liczba, waluta)
-  return liczba > 0 ? `+${tekst}` : tekst
+export function formatujRoznice(
+  wartosc: string | number,
+  waluta = "PLN",
+): string {
+  const liczba = typeof wartosc === "string" ? Number(wartosc) : wartosc;
+  if (!Number.isFinite(liczba)) return BRAK_DANYCH;
+  const tekst = formatujKwote(liczba, waluta);
+  return liczba > 0 ? `+${tekst}` : tekst;
 }
 
 /** Procent, np. "3,70%". Wejscie to string z API (Decimal), nie number. */
 export function formatujProcent(wartosc: string | number): string {
-  const liczba = typeof wartosc === 'string' ? Number(wartosc) : wartosc
-  if (!Number.isFinite(liczba)) return BRAK_DANYCH
+  const liczba = typeof wartosc === "string" ? Number(wartosc) : wartosc;
+  if (!Number.isFinite(liczba)) return BRAK_DANYCH;
   return `${new Intl.NumberFormat(LOCALE, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     ...GRUPOWANIE,
-  }).format(liczba)}%`
+  }).format(liczba)}%`;
 }
 
 /** Brak danych to informacja, nie pusta komorka (koncepcja, decyzja D5). */
-export const BRAK_DANYCH = '—'
+export const BRAK_DANYCH = "—";
 
 /**
  * Ile zostalo do terminu, slowami: "za 12 dni", "dzis", "8 dni po terminie".
@@ -95,12 +101,13 @@ export const BRAK_DANYCH = '—'
  * Polska liczba mnoga "dnia" jest tu prosta: wyjatkiem jest tylko jedynka.
  */
 export function opisTerminu(dni: number | null | undefined): string {
-  if (dni === null || dni === undefined || !Number.isFinite(dni)) return BRAK_DANYCH
-  if (dni === 0) return 'dziś'
-  if (dni === 1) return 'jutro'
-  if (dni === -1) return 'wczoraj, po terminie'
-  if (dni > 0) return `za ${dni} dni`
-  return `${Math.abs(dni)} dni po terminie`
+  if (dni === null || dni === undefined || !Number.isFinite(dni))
+    return BRAK_DANYCH;
+  if (dni === 0) return "dziś";
+  if (dni === 1) return "jutro";
+  if (dni === -1) return "wczoraj, po terminie";
+  if (dni > 0) return `za ${dni} dni`;
+  return `${Math.abs(dni)} dni po terminie`;
 }
 
 /**
@@ -108,8 +115,9 @@ export function opisTerminu(dni: number | null | undefined): string {
  * dokumentow chodzi o rzad wielkosci, a nie o dokladna liczbe bajtow.
  */
 export function formatujRozmiar(bajty: number | null | undefined): string {
-  if (bajty === null || bajty === undefined || !Number.isFinite(bajty)) return BRAK_DANYCH
-  if (bajty < 1024) return `${bajty} B`
-  if (bajty < 1024 * 1024) return `${Math.round(bajty / 1024)} kB`
-  return `${(bajty / 1024 / 1024).toFixed(1)} MB`
+  if (bajty === null || bajty === undefined || !Number.isFinite(bajty))
+    return BRAK_DANYCH;
+  if (bajty < 1024) return `${bajty} B`;
+  if (bajty < 1024 * 1024) return `${Math.round(bajty / 1024)} kB`;
+  return `${(bajty / 1024 / 1024).toFixed(1)} MB`;
 }

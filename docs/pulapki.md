@@ -75,9 +75,15 @@ Działa **tylko dlatego**, że `PUT` wymaga pola `wersja` w treści żądania.
 Bez niego serwer wczytuje rekord świeżo, nadpisuje go i nigdy nie zauważa,
 że ktoś zmienił go w międzyczasie.
 
-### `POLA_UTAJNIONE` w `uslugi/audyt.py`
-Trzyma `hash_hasla` i `token_hash` poza logiem. Skrót hasła w logu audytu
-to ten sam sekret w drugiej tabeli, czytanej przez szerszy krąg osób.
+### Audyt nie zapisuje, kto zmienił
+`log_audytu` odpowiada na pytanie **co, kiedy i z jakiej wartości na jaką**,
+ale nie **kto**. Kolumny autora nie ma, bo program nie ma logowania
+([ADR 009](decyzje/009-usuniecie-logowania.md)). To wygląda na przeoczenie
+przy czytaniu sekcji 8.1 koncepcji, a jest decyzją. Przy drugim użytkowniku
+trzeba to cofnąć.
+
+Zniknął razem z tym mechanizm `POLA_UTAJNIONE`, który trzymał `hash_hasla`
+i `token_hash` poza logiem — nie ma już takich kolumn.
 
 ### Status nowego parametru
 Nowa wartość wchodzi jako `zaproponowana` także przy ręcznym wpisaniu z klawiatury.
@@ -308,3 +314,84 @@ Osobno `niedostepnych` liczy katalogi i pliki, których system nie udostępnił
 Wcześniej jeden taki katalog kończył cały skan błędem 500 i użytkownik nie
 widział ani jednego swojego dokumentu. Milczące pomijanie byłoby złamaniem
 decyzji D5, więc liczba trafia na ekran.
+
+### Katalog skanu: baza wygrywa z plikiem `.env`
+`uslugi/ustawienia_systemu.katalog_skanu()` czyta najpierw tabelę
+`ustawienie_systemu`, a dopiero potem `KATALOG_SKANU` z `.env`. Kolejność jest
+celowa: wartość w pliku ustawia ten, kto instaluje program, wartość w bazie —
+użytkownik. Pusta tabela znaczy „bierz to, co w pliku", więc instalacja bez
+żadnego kliknięcia działa jak wcześniej.
+
+Skutek dla diagnozy: gdy skan patrzy „nie tam, gdzie mówi `.env`", zajrzyj do
+`ustawienie_systemu`, nie do pliku. Ekran pokazuje źródło wprost (`z pliku .env`
+albo nic, gdy wartość pochodzi z bazy).
+
+Zmiana wymaga roli administratora, ale **odczyt ma każdy** — bez tego nie da się
+odpowiedzieć na pytanie „gdzie ten program właściwie szuka".
+
+### Dwie instalacje na jednym komputerze rozmawiają z tą samą bazą
+Port `5434` jest stałą w `lokalny-postgres.ps1`. `Czy-Dziala` sprawdza wyłącznie,
+czy **coś** odpowiada na tym porcie — nie czy to ten właściwy serwer. Skutek:
+przy uruchomionej bazie deweloperskiej instalacja testowa w innym katalogu
+nie wystartuje własnego Postgresa, tylko cicho podłączy się do tamtego
+i puści na nim `alembic upgrade head`.
+
+Dla docelowego użycia (jeden komputer, jedna instalacja) to bez znaczenia.
+Ale **próbę generalną aktualizacji rób z zatrzymaną bazą deweloperską**, inaczej
+przećwiczysz ją na swoich prawdziwych danych.
+
+### `$env:TEMP` bywa ścieżką 8.3 i wywraca `Remove-Item`
+Na koncie z nazwą dłuższą niż osiem znaków `TEMP` to
+`C:\Users\HPOMEN~1\AppData\Local\Temp`. `Remove-Item -LiteralPath` na ścieżce
+zbudowanej z takiego prefiksu kończy się `An object at the specified path
+C:\Users\HPOMEN~1 does not exist`, mimo że katalog istnieje.
+
+Dlatego `spakuj-wydanie.ps1`, `aktualizuj.ps1` i `diagnostyka.ps1` trzymają
+katalogi robocze obok celu, nie w `TEMP`. W aktualizatorze ma to drugą zaletę:
+`program-nowa` leży na tym samym wolumenie co `program`, więc `Move-Item` jest
+zmianą nazwy, a nie kopiowaniem setek megabajtów.
+
+### `robocopy` zwraca mapę bitową, nie kod błędu
+`0–7` to sukces (`1` = skopiowano pliki, `2` = w celu są pliki nadmiarowe…),
+dopiero `8` w górę to awaria. Bez `if ($LASTEXITCODE -ge 8)` w
+`kopia-zapasowa.ps1` pierwsza udana kopia wyglądałaby jak błąd.
+
+### Aktualizacja nie podmienia skryptów z `instalator\`
+`aktualizuj.ps1` zmienia nazwę katalogu `program`, więc sam musi leżeć poza nim.
+Konsekwencja: paczka wydania **nie aktualizuje aktualizatora**. Poprawka w nim
+wymaga ręcznej podmiany pliku u użytkownika. To powód, żeby trzymać te skrypty
+krótkie — opisane w [ADR 010](decyzje/010-instalacja-u-uzytkownika-i-kanal-aktualizacji.md).
+
+### Cofnięcie wersji nie cofa bazy
+`Cofnij aktualizacje.cmd` zamienia katalogi z kodem. Struktura bazy zostaje ta,
+którą zrobiła z niej migracja. W tym projekcie migracje są dokładające (nic nie
+usuwamy fizycznie), więc starsza wersja programu zwykle sobie poradzi — ale
+„zwykle" to nie „zawsze". Ratunkiem jest zrzut z `dane\kopie`, a jego
+odtworzenie kasuje wszystko wprowadzone po zrzucie, więc żaden skrypt nie robi
+tego sam.
+
+### `| Out-Null` na wywołaniu `lokalny-postgres.ps1 start` wiesza skrypt
+`Start-Serwer` odpala `postgres.exe` przez `Start-Process` z przekierowanymi
+strumieniami, a uruchomiony serwer **dziedziczy uchwyt wyjścia procesu
+potomnego**. Potok czeka na zamknięcie tego uchwytu, czyli na zatrzymanie bazy —
+i skrypt wisi w nieskończoność mimo poprawnie działającej bazy.
+
+Kosztowało to zawieszony aktualizator na kroku „robię kopię bazy danych":
+z perspektywy użytkownika okno, które nigdy się nie kończy. Nie tłumi się
+wyjścia tych wywołań. Ta sama uwaga stoi już w `uruchom.ps1` przy kroku 2.
+
+### Środowisko Pythona musi leżeć poza katalogiem `program`
+Domyślnie `uv` trzyma je w `backend\.venv`, czyli w katalogu, który aktualizacja
+podmienia. Efekt: każde wydanie odbudowuje środowisko od zera — minuta czekania
+i **wymóg internetu albo pełnego cache `uv`** na komputerze, który miał działać
+bez sieci. Dlatego `zainstaluj.ps1` i `aktualizuj.ps1` ustawiają
+`UV_PROJECT_ENVIRONMENT` na `<instalacja>\srodowisko`.
+
+### Normalizacja kodowania: otwarcie pliku do zapisu czyści go przed zapisem
+Skrypt porządkujący pliki na ASCII skasował treść `zaplanuj-kopie.ps1`:
+`open(p, 'w')` obciął plik, a `write()` zaraz potem wywalił się na polskim
+znaku. Został pusty plik, a instalator uruchamiał go bez słowa skargi — bo pusty
+skrypt PowerShella nic nie robi i o niczym nie informuje.
+
+Wniosek na przyszłość: konwersje kodowania rób do bufora i zapisuj dopiero po
+udanej konwersji, a po każdej masowej operacji na plikach sprawdź ich rozmiary.

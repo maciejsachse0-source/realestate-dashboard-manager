@@ -359,7 +359,6 @@ def zaimportuj_plik(
     numer: str | None,
     data_dokumentu: date | None,
     data_obowiazywania_od: date | None,
-    uzytkownik_id: int,
 ) -> Dokument:
     """Zaklada dokument wskazujacy na plik lezacy na dysku uzytkownika.
 
@@ -398,7 +397,6 @@ def zaimportuj_plik(
         dokument_nadrzedny_id=dokument_nadrzedny_id,
         status_przetworzenia=StatusPrzetworzenia.WGRANY,
         przechowywanie=TrybPrzechowywania.LINK,
-        wgral_uzytkownik_id=uzytkownik_id,
     )
     baza.add(dokument)
     baza.flush()
@@ -411,7 +409,6 @@ def pomin_plik(
     sciezka_wzgledna: str,
     katalog: Path | None,
     powod: str | None,
-    uzytkownik_id: int,
 ) -> PominietyPlik:
     """Zapamietuje, ze tego pliku nie importujemy.
 
@@ -434,7 +431,6 @@ def pomin_plik(
         nazwa_pliku=plik.name[:300],
         sciezka_wzgledna=sciezka_wzgledna[:500],
         powod=powod,
-        pominal_uzytkownik_id=uzytkownik_id,
     )
     baza.add(pominiecie)
     baza.flush()

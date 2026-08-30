@@ -1,5 +1,6 @@
 """Jedyne miejsce w projekcie czytajace zmienne srodowiskowe."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -9,11 +10,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 KATALOG_REPO = Path(__file__).resolve().parents[3]
 
 
+def _plik_env() -> Path:
+    """Skad czytamy .env.
+
+    W repozytorium lezy on obok kodu i tak zostaje. W instalacji u uzytkownika
+    nalezy do danych, a nie do programu: aktualizacja podmienia katalog
+    z kodem, wiec konfiguracja trzymana w srodku ginelaby przy kazdym wydaniu.
+    Sciezke podaje wtedy narzedzia/sciezki.ps1 przez NAJEM_PLIK_ENV.
+    """
+    wskazany = os.environ.get("NAJEM_PLIK_ENV")
+    return Path(wskazany) if wskazany else KATALOG_REPO / ".env"
+
+
 class Ustawienia(BaseSettings):
     """Konfiguracja aplikacji. Wszystko przez zmienne srodowiskowe, zero sekretow w repo."""
 
     model_config = SettingsConfigDict(
-        env_file=(KATALOG_REPO / ".env"),
+        env_file=_plik_env(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

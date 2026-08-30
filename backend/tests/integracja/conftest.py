@@ -14,8 +14,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from najem.baza import silnik
-from najem.domena.slowniki import RolaUzytkownika, TypLokalu
-from najem.modele import Budynek, Lokal, Najemca, Uzytkownik
+from najem.domena.slowniki import TypLokalu
+from najem.modele import Budynek, Lokal, Najemca
 
 
 @pytest.fixture(scope="session")
@@ -55,18 +55,6 @@ def sesja(polaczenie: Connection) -> Iterator[Session]:
     finally:
         s.close()
         transakcja.rollback()
-
-
-@pytest.fixture
-def uzytkownik(sesja: Session) -> Uzytkownik:
-    u = Uzytkownik(
-        login="testowy",
-        imie_nazwisko="Jan Testowy",
-        rola=RolaUzytkownika.ZARZADCA,
-    )
-    sesja.add(u)
-    sesja.flush()
-    return u
 
 
 @pytest.fixture

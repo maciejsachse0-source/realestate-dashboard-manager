@@ -6,27 +6,28 @@ kopiowane i nic nie jest zgadywane z nazwy folderu.
 """
 
 from datetime import UTC, date, datetime
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from najem.auth.zaleznosci import Operator, Podglad
 from najem.baza import SesjaBazy
-from najem.config import ustawienia
 from najem.dokumenty.przechowalnia import BladPliku
 from najem.domena.slowniki import OperacjaAudytu, TrybPrzechowywania, TypDokumentu
 from najem.modele import Dokument, OkresNajmu, PominietyPlik, PowiazanieFolderu
 from najem.uslugi.audyt import zapisz_zmiane
 from najem.uslugi.skan_folderow import BladSkanu, pomin_plik, skanuj, sprawdz_linki
 from najem.uslugi.skan_folderow import zaimportuj_plik as usluga_importu
+from najem.uslugi.ustawienia_systemu import (
+    BladUstawienia,
+    katalog_skanu,
+    opis_katalogu_skanu,
+    sprawdz_katalog,
+    wyczysc_katalog_skanu,
+    zapisz_katalog_skanu,
+)
 
 router = APIRouter(prefix="/skan", tags=["skan"])
-
-
-def _katalog() -> Path | None:
-    return ustawienia().katalog_skanu
 
 
 def _adres(request: Request) -> str | None:
@@ -34,6 +35,17 @@ def _adres(request: Request) -> str | None:
 
 
 # ----------------------------------------------------------------- schematy
+
+
+class KatalogWejscie(BaseModel):
+    sciezka: str = Field(max_length=500)
+
+
+class KatalogWyjscie(BaseModel):
+    sciezka: str | None
+    #: baza | plik | brak
+    zrodlo: str
+    istnieje: bool
 
 
 class PlikWyjscie(BaseModel):
@@ -140,15 +152,86 @@ class PrzegladLinkowWyjscie(BaseModel):
 # ---------------------------------------------------------------- endpointy
 
 
+@router.get(
+    "/katalog",
+    response_model=KatalogWyjscie,
+    summary="Który katalog jest przeszukiwany",
+)
+def katalog(baza: SesjaBazy) -> KatalogWyjscie:
+    """Ścieżka razem z informacją, skąd pochodzi.
+
+    Bez tej informacji zmiana ustawienia wygląda na nieskuteczną: człowiek
+    wpisuje ścieżkę, a ekran dalej pokazuje tę z pliku `.env`.
+    """
+    opis = opis_katalogu_skanu(baza)
+    return KatalogWyjscie(
+        sciezka=str(opis.sciezka) if opis.sciezka else None,
+        zrodlo=opis.zrodlo,
+        istnieje=opis.istnieje,
+    )
+
+
+@router.put(
+    "/katalog",
+    response_model=KatalogWyjscie,
+    summary="Ustawia katalog z dokumentami",
+)
+def ustaw_katalog(dane: KatalogWejscie, baza: SesjaBazy, request: Request) -> KatalogWyjscie:
+    """Zmiana konfiguracji systemu, więc tylko administrator.
+
+    Katalog musi istnieć w chwili zapisu. Literówka w ścieżce jest najczęstszym
+    błędem przy tym polu, a wykryta od razu kosztuje poprawkę jednego znaku
+    zamiast szukania, czemu skan nic nie znajduje.
+    """
+    try:
+        sciezka = sprawdz_katalog(dane.sciezka)
+    except BladUstawienia as blad:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(blad)) from blad
+
+    wiersz = zapisz_katalog_skanu(baza, sciezka=sciezka)
+    zapisz_zmiane(
+        baza,
+        wiersz,
+        operacja=OperacjaAudytu.ZMIANA,
+        adres_ip=_adres(request),
+    )
+    baza.commit()
+    return KatalogWyjscie(sciezka=str(sciezka), zrodlo="baza", istnieje=True)
+
+
+@router.delete(
+    "/katalog",
+    response_model=KatalogWyjscie,
+    summary="Przywraca katalog z pliku .env",
+)
+def wyczysc_katalog(baza: SesjaBazy, request: Request) -> KatalogWyjscie:
+    wiersz = wyczysc_katalog_skanu(baza)
+    if wiersz is not None:
+        zapisz_zmiane(
+            baza,
+            wiersz,
+            operacja=OperacjaAudytu.USUNIECIE,
+            adres_ip=_adres(request),
+        )
+    baza.commit()
+
+    opis = opis_katalogu_skanu(baza)
+    return KatalogWyjscie(
+        sciezka=str(opis.sciezka) if opis.sciezka else None,
+        zrodlo=opis.zrodlo,
+        istnieje=opis.istnieje,
+    )
+
+
 @router.get("", response_model=SkanWyjscie, summary="Co leży w folderach na dysku")
-def skan(baza: SesjaBazy, _: Operator) -> SkanWyjscie:
+def skan(baza: SesjaBazy) -> SkanWyjscie:
     """Przegląda drzewo katalogów i zestawia je z tym, co już jest w bazie.
 
     Niczego nie zapisuje. Skan pliku, którego jeszcze nie znamy, wymaga
     policzenia jego skrótu, więc przy pierwszym uruchomieniu na dużym
     archiwum potrafi chwilę potrwać.
     """
-    wynik = skanuj(baza, katalog=_katalog())
+    wynik = skanuj(baza, katalog=katalog_skanu(baza))
     return SkanWyjscie(
         katalog=wynik.katalog,
         dostepny=wynik.dostepny,
@@ -185,9 +268,7 @@ def skan(baza: SesjaBazy, _: Operator) -> SkanWyjscie:
     status_code=status.HTTP_201_CREATED,
     summary="Przypisuje folder do umowy",
 )
-def powiaz(
-    dane: PowiazanieWejscie, baza: SesjaBazy, kto: Operator, request: Request
-) -> PowiazanieWyjscie:
+def powiaz(dane: PowiazanieWejscie, baza: SesjaBazy, request: Request) -> PowiazanieWyjscie:
     """Jednorazowe sparowanie folderu z umową.
 
     Oznaczenia lokali w nazwach folderów są nieregularne, więc system ich nie
@@ -206,12 +287,10 @@ def powiaz(
         # Zmiana przypisania to poprawka pomyłki, a nie błąd. Stare powiązanie
         # zamykamy miękko, żeby ślad po niej został.
         istniejace.usunieto_dnia = datetime.now(UTC)
-        istniejace.usunal_uzytkownik_id = kto.uzytkownik.id
         zapisz_zmiane(
             baza,
             istniejace,
             operacja=OperacjaAudytu.USUNIECIE,
-            uzytkownik_id=kto.uzytkownik.id,
             adres_ip=_adres(request),
         )
         baza.flush()
@@ -219,7 +298,6 @@ def powiaz(
     powiazanie = PowiazanieFolderu(
         sciezka_wzgledna=dane.sciezka_wzgledna,
         okres_najmu_id=dane.okres_najmu_id,
-        powiazal_uzytkownik_id=kto.uzytkownik.id,
         uwagi=dane.uwagi,
     )
     baza.add(powiazanie)
@@ -228,7 +306,6 @@ def powiaz(
         baza,
         powiazanie,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -244,18 +321,16 @@ def powiaz(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Odpina folder od umowy",
 )
-def odepnij(powiazanie_id: int, baza: SesjaBazy, kto: Operator, request: Request) -> None:
+def odepnij(powiazanie_id: int, baza: SesjaBazy, request: Request) -> None:
     powiazanie = baza.get(PowiazanieFolderu, powiazanie_id)
     if powiazanie is None or powiazanie.usunieto_dnia is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Takiego powiązania nie ma.")
 
     powiazanie.usunieto_dnia = datetime.now(UTC)
-    powiazanie.usunal_uzytkownik_id = kto.uzytkownik.id
     zapisz_zmiane(
         baza,
         powiazanie,
         operacja=OperacjaAudytu.USUNIECIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -267,9 +342,7 @@ def odepnij(powiazanie_id: int, baza: SesjaBazy, kto: Operator, request: Request
     status_code=status.HTTP_201_CREATED,
     summary="Dodaje dokument jako odnośnik do pliku na dysku",
 )
-def zaimportuj(
-    dane: ImportWejscie, baza: SesjaBazy, kto: Operator, request: Request
-) -> ZaimportowanyWyjscie:
+def zaimportuj(dane: ImportWejscie, baza: SesjaBazy, request: Request) -> ZaimportowanyWyjscie:
     """Plik zostaje tam, gdzie leży. W bazie ląduje ścieżka, skrót i rozmiar.
 
     Skutek uboczny, który trzeba znać: przeniesienie albo przemianowanie pliku
@@ -289,14 +362,13 @@ def zaimportuj(
         dokument = usluga_importu(
             baza,
             sciezka_wzgledna=dane.sciezka_wzgledna,
-            katalog=_katalog(),
+            katalog=katalog_skanu(baza),
             typ=dane.typ,
             okres_najmu_id=dane.okres_najmu_id,
             dokument_nadrzedny_id=dane.dokument_nadrzedny_id,
             numer=dane.numer,
             data_dokumentu=dane.data_dokumentu,
             data_obowiazywania_od=dane.data_obowiazywania_od,
-            uzytkownik_id=kto.uzytkownik.id,
         )
     except BladSkanu as blad:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(blad)) from blad
@@ -307,7 +379,6 @@ def zaimportuj(
         baza,
         dokument,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -329,16 +400,13 @@ def zaimportuj(
     status_code=status.HTTP_201_CREATED,
     summary="Zapamiętuje, że tego pliku nie importujemy",
 )
-def pomin(
-    dane: PominiecieWejscie, baza: SesjaBazy, kto: Operator, request: Request
-) -> PominiecieWyjscie:
+def pomin(dane: PominiecieWejscie, baza: SesjaBazy, request: Request) -> PominiecieWyjscie:
     try:
         pominiecie = pomin_plik(
             baza,
             sciezka_wzgledna=dane.sciezka_wzgledna,
-            katalog=_katalog(),
+            katalog=katalog_skanu(baza),
             powod=dane.powod,
-            uzytkownik_id=kto.uzytkownik.id,
         )
     except BladSkanu as blad:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(blad)) from blad
@@ -347,7 +415,6 @@ def pomin(
         baza,
         pominiecie,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -363,18 +430,16 @@ def pomin(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Cofa pominięcie pliku",
 )
-def cofnij_pominiecie(pominiecie_id: int, baza: SesjaBazy, kto: Operator, request: Request) -> None:
+def cofnij_pominiecie(pominiecie_id: int, baza: SesjaBazy, request: Request) -> None:
     pominiecie = baza.get(PominietyPlik, pominiecie_id)
     if pominiecie is None or pominiecie.usunieto_dnia is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Takiego pominięcia nie ma.")
 
     pominiecie.usunieto_dnia = datetime.now(UTC)
-    pominiecie.usunal_uzytkownik_id = kto.uzytkownik.id
     zapisz_zmiane(
         baza,
         pominiecie,
         operacja=OperacjaAudytu.USUNIECIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -385,13 +450,13 @@ def cofnij_pominiecie(pominiecie_id: int, baza: SesjaBazy, kto: Operator, reques
     response_model=PrzegladLinkowWyjscie,
     summary="Sprawdza, czy zlinkowane pliki nadal są na miejscu",
 )
-def sprawdz(baza: SesjaBazy, _: Podglad) -> PrzegladLinkowWyjscie:
+def sprawdz(baza: SesjaBazy) -> PrzegladLinkowWyjscie:
     """Cena za brak kopiowania: plik przeniesiony w Eksploratorze zrywa odnośnik.
 
     Ten przegląd ma sprawić, że zerwanie widać od razu, a nie dopiero wtedy,
     gdy dokument jest potrzebny.
     """
-    katalog = _katalog()
+    katalog = katalog_skanu(baza)
     zerwane = sprawdz_linki(baza, katalog=katalog)
     wszystkich = baza.scalar(
         select(func.count())

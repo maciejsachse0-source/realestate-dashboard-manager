@@ -50,7 +50,8 @@ Termin płatności "do 10-go" wypadający w niedzielę. Termin "14 dni od przeka
 `status` okresu najmu musi być zdefiniowany jako zbiór stanów i dozwolonych przejść, wymuszony w kodzie. Inaczej po pół roku w bazie będą umowy jednocześnie "zakończone" i "aktywne".
 
 **G. Nic się nie kasuje**
-Soft delete wszędzie (`usunięto_dnia`, `usunął_użytkownik`) plus osobna, tylko dopisywalna tabela audytu. W systemie, który ma rozstrzygać spory z najemcami, twarde usunięcie rekordu to problem prawny, nie techniczny.
+Soft delete wszędzie (`usunięto_dnia`; kolumny `usunął_użytkownik` już nie ma —
+[ADR 009](decyzje/009-usuniecie-logowania.md)) plus osobna, tylko dopisywalna tabela audytu. W systemie, który ma rozstrzygać spory z najemcami, twarde usunięcie rekordu to problem prawny, nie techniczny.
 
 **H. Konflikt edycji**
 Dwie osoby otwierają ten sam profil lokalu. Potrzebne optimistic locking (kolumna `wersja`, przy zapisie sprawdzenie, czy się nie zmieniła). Bez tego cicha utrata zmian.
@@ -64,6 +65,9 @@ PostgreSQL nie ma domyślnie polskiej konfiguracji do wyszukiwania. Trzeba doda�
 Przecinek dziesiętny, spacja jako separator tysięcy, daty `DD.MM.RRRR`, kwoty `1 234,56 zł`. Wymuszone przez jedną funkcję formatującą, nie ad hoc w komponentach. Do tego walidacja NIP (suma kontrolna), REGON i KRS.
 
 **K. Uwierzytelnianie i sesje**
+> **Cofnięte 28.08.2026** — [ADR 009](decyzje/009-usuniecie-logowania.md). Zbudowane, potem usunięte w całości.
+> Zapis zostaje jako punkt wyjścia przy ewentualnej odbudowie.
+
 Konkretne decyzje: hasła haszowane Argon2id, sesje w ciasteczkach HttpOnly + SameSite, blokada konta po N nieudanych próbach, wymuszona zmiana hasła przy pierwszym logowaniu. Jeśli firma ma AD lub LDAP, integracja od razu, bo doklejenie jej później oznacza przebudowę warstwy auth.
 
 **L. Bezpieczeństwo uploadu**
@@ -633,12 +637,13 @@ Po utworzeniu pokaż mi CLAUDE.md do akceptacji, zanim zapiszesz resztę.
 Zaimplementuj model danych wg docs/system-najem-koncepcja.md, sekcja 3.
 
 Encje: Budynek, Lokal, Najemca, OkresNajmu, Dokument, ParametrWartosc,
-SkladnikOplaty, Zabezpieczenie, ObowiazekPrzegladu, Zdarzenie, Uzytkownik, AuditLog.
+SkladnikOplaty, Zabezpieczenie, ObowiazekPrzegladu, Zdarzenie, ~~Uzytkownik~~, AuditLog.
+(Encja `Uzytkownik` została usunięta 28.08.2026 — [ADR 009](decyzje/009-usuniecie-logowania.md).)
 
 Wymagania twarde:
 - kwoty NUMERIC(12,2), każda z polami: netto/brutto i stawka VAT
 - daty biznesowe DATE, znaczniki techniczne TIMESTAMPTZ w UTC
-- soft delete na wszystkich encjach biznesowych (usunieto_dnia, usunal_uzytkownik_id)
+- soft delete na wszystkich encjach biznesowych (usunieto_dnia)
 - kolumna wersja do optimistic locking na encjach edytowalnych
 - ParametrWartosc: klucz, wartosc, obowiazuje_od, obowiazuje_do, dokument_zrodlowy_id,
   lokalizacja_w_dokumencie, status_weryfikacji, zatwierdzil, zatwierdzono_dnia
@@ -719,6 +724,12 @@ tworzy dokładnie tyle samo zdarzeń co jednokrotne.
 ---
 
 ### E4. API i uwierzytelnianie
+
+> **Część „uwierzytelnianie" została cofnięta.** Zbudowano ją zgodnie z tym
+> opisem, a 28.08.2026 usunięto w całości razem z rolami, sesjami i kolumnami
+> autorstwa w bazie. Powód i konsekwencje: [ADR 009](decyzje/009-usuniecie-logowania.md). Poniższy opis zostaje jako
+> zapis pierwotnego zamysłu i punkt wyjścia, gdyby trzeba było go odbudować.
+> Część „API" obowiązuje bez zmian, minus sprawdzanie ról.
 
 **Prompt:**
 ```
@@ -935,7 +946,7 @@ Domknij projekt:
    - instrukcja wdrożenia w README: od czystego serwera do działającej aplikacji
    - lista portów i reguł firewalla, z domyślną blokadą ruchu wychodzącego
 
-4. Testy E2E (Playwright) na krytycznych ścieżkach: logowanie, filtrowanie na dashboardzie,
+4. Testy E2E (Playwright) na krytycznych ścieżkach: filtrowanie na dashboardzie,
    wejście w profil, weryfikacja dokumentu, waloryzacja.
 ```
 
@@ -949,7 +960,7 @@ Domknij projekt:
 |---|---|---|
 | **Jednostkowe, domena** | reguły biznesowe, pieniądze, kalendarz, stan efektywny | najwięcej, powyżej 90 procent pokrycia, to jest priorytet |
 | **Integracyjne, repozytoria** | zapytania czasowe, indeksy, migracje | średnio, głównie zapytania o stan efektywny |
-| **API** | autoryzacja per rola, walidacja wejścia, kody błędów | średnio, obowiązkowo testy ról |
+| **API** | walidacja wejścia, kody błędów (autoryzacji i ról nie ma — [ADR 009](decyzje/009-usuniecie-logowania.md)) | średnio |
 | **Frontend jednostkowe** | funkcje formatujące, walidacja NIP, logika filtrów | mało, tylko logika |
 | **E2E** | pięć krytycznych ścieżek | mało, ale muszą działać |
 
@@ -1036,8 +1047,8 @@ To ma znaczenie przy rozmowie o budżecie i priorytetach: **AI jest ostatnią tr
 
 - [ ] Backup wykonany i **odtworzony na czystej maszynie**
 - [ ] Ruch wychodzący z serwera zablokowany na poziomie firewalla
-- [ ] Konta testowe usunięte, hasła domyślne zmienione
-- [ ] Role sprawdzone na realnych użytkownikach
+- [x] ~~Konta testowe usunięte, hasła domyślne zmienione~~ — nie dotyczy, nie ma kont ([ADR 009](decyzje/009-usuniecie-logowania.md))
+- [x] ~~Role sprawdzone na realnych użytkownikach~~ — nie dotyczy, nie ma ról
 - [ ] Instrukcja dla użytkowników napisana (jedna strona wystarczy)
 - [ ] Ustalone, kto zgłasza problemy i do kogo
 - [ ] Test odtworzenia z backupu wpisany w kalendarz jako cykliczny

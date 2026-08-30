@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react'
-import type { FiltryLokali } from '@/api/typy'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useEffect, useState } from "react";
+import type { FiltryLokali } from "@/api/typy";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /** Ile milisekund czekamy, zanim wyszukiwarka uderzy w API. */
-const OPOZNIENIE_SZUKANIA = 300
+const OPOZNIENIE_SZUKANIA = 300;
 
 interface Props {
-  filtry: FiltryLokali
-  budynki: { id: number; nazwa: string }[]
-  onZmiana: (filtry: FiltryLokali) => void
+  filtry: FiltryLokali;
+  budynki: { id: number; nazwa: string }[];
+  onZmiana: (filtry: FiltryLokali) => void;
 }
 
 /**
@@ -19,25 +19,26 @@ interface Props {
  * zawezalby wynik i ladowal na pustej liscie, mimo ze wyniki sa.
  */
 export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
-  const [szukaj, setSzukaj] = useState(filtry.szukaj ?? '')
+  const [szukaj, setSzukaj] = useState(filtry.szukaj ?? "");
 
   useEffect(() => {
     const licznik = setTimeout(() => {
-      if ((filtry.szukaj ?? '') !== szukaj) {
-        onZmiana({ ...filtry, szukaj: szukaj || undefined, offset: 0 })
+      if ((filtry.szukaj ?? "") !== szukaj) {
+        onZmiana({ ...filtry, szukaj: szukaj || undefined, offset: 0 });
       }
-    }, OPOZNIENIE_SZUKANIA)
-    return () => clearTimeout(licznik)
-  }, [szukaj, filtry, onZmiana])
+    }, OPOZNIENIE_SZUKANIA);
+    return () => clearTimeout(licznik);
+  }, [szukaj, filtry, onZmiana]);
 
   function ustaw(zmiana: Partial<FiltryLokali>) {
-    onZmiana({ ...filtry, ...zmiana, offset: 0 })
+    onZmiana({ ...filtry, ...zmiana, offset: 0 });
   }
 
   const aktywne = Object.entries(filtry).filter(
     ([klucz, wartosc]) =>
-      !['limit', 'offset', 'sortuj', 'malejaco'].includes(klucz) && wartosc !== undefined,
-  ).length
+      !["limit", "offset", "sortuj", "malejaco"].includes(klucz) &&
+      wartosc !== undefined,
+  ).length;
 
   return (
     <div className="rounded-lg border bg-background p-4">
@@ -57,9 +58,11 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
           <select
             id="budynek"
             className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-            value={filtry.budynek_id ?? ''}
+            value={filtry.budynek_id ?? ""}
             onChange={(e) =>
-              ustaw({ budynek_id: e.target.value ? Number(e.target.value) : undefined })
+              ustaw({
+                budynek_id: e.target.value ? Number(e.target.value) : undefined,
+              })
             }
           >
             <option value="">Wszystkie</option>
@@ -76,10 +79,11 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
           <select
             id="status"
             className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-            value={filtry.status_umowy ?? ''}
+            value={filtry.status_umowy ?? ""}
             onChange={(e) =>
               ustaw({
-                status_umowy: (e.target.value || undefined) as FiltryLokali['status_umowy'],
+                status_umowy: (e.target.value ||
+                  undefined) as FiltryLokali["status_umowy"],
               })
             }
           >
@@ -96,7 +100,7 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
           <Input
             id="koniec_od"
             type="date"
-            value={filtry.koniec_od ?? ''}
+            value={filtry.koniec_od ?? ""}
             onChange={(e) => ustaw({ koniec_od: e.target.value || undefined })}
           />
         </div>
@@ -106,7 +110,7 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
           <Input
             id="koniec_do"
             type="date"
-            value={filtry.koniec_do ?? ''}
+            value={filtry.koniec_do ?? ""}
             onChange={(e) => ustaw({ koniec_do: e.target.value || undefined })}
           />
         </div>
@@ -117,7 +121,9 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
               type="checkbox"
               className="size-4"
               checked={filtry.waloryzacja === true}
-              onChange={(e) => ustaw({ waloryzacja: e.target.checked ? true : undefined })}
+              onChange={(e) =>
+                ustaw({ waloryzacja: e.target.checked ? true : undefined })
+              }
             />
             Tylko z waloryzacją
           </label>
@@ -127,7 +133,9 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
               type="checkbox"
               className="size-4"
               checked={filtry.niekompletne === true}
-              onChange={(e) => ustaw({ niekompletne: e.target.checked ? true : undefined })}
+              onChange={(e) =>
+                ustaw({ niekompletne: e.target.checked ? true : undefined })
+              }
             />
             Tylko niekompletne
           </label>
@@ -137,8 +145,8 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
               type="button"
               className="ml-auto text-sm underline underline-offset-4"
               onClick={() => {
-                setSzukaj('')
-                onZmiana({ limit: filtry.limit, offset: 0 })
+                setSzukaj("");
+                onZmiana({ limit: filtry.limit, offset: 0 });
               }}
             >
               Wyczyść filtry ({aktywne})
@@ -147,5 +155,5 @@ export function PanelFiltrow({ filtry, budynki, onZmiana }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

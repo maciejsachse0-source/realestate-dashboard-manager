@@ -1,7 +1,7 @@
-import { Fragment, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Fragment, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import type { Budynek, LokalNaLiscie, Najemca } from '@/api/typy'
+import type { Budynek, LokalNaLiscie, Najemca } from "@/api/typy";
 import {
   useBudynki,
   useDodajBudynek,
@@ -9,9 +9,8 @@ import {
   useDodajNajemce,
   useLokale,
   useNajemcy,
-  useProfil,
-} from '@/api/zapytania'
-import { formatujPowierzchnie } from '@/funkcje/format'
+} from "@/api/zapytania";
+import { formatujPowierzchnie } from "@/funkcje/format";
 import {
   DialogFormularza,
   PoleTekstowe,
@@ -19,9 +18,9 @@ import {
   PoleZaznaczenia,
   liczbaLubNull,
   pustyNaNull,
-} from '@/komponenty/Formularz'
-import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
-import { Button } from '@/components/ui/button'
+} from "@/komponenty/Formularz";
+import { Blad, Ladowanie, Pusto } from "@/komponenty/Stany";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -29,33 +28,35 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ETYKIETY_TYPU: Record<string, string> = {
-  handlowy: 'Handlowy',
-  biurowy: 'Biurowy',
-  magazyn: 'Magazyn',
-  miejsce_postojowe: 'Miejsce postojowe',
-  inny: 'Inny',
-}
+  handlowy: "Handlowy",
+  biurowy: "Biurowy",
+  magazyn: "Magazyn",
+  miejsce_postojowe: "Miejsce postojowe",
+  inny: "Inny",
+};
 
 const ETYKIETY_STATUSU: Record<string, string> = {
-  wolny: 'Wolny',
-  wynajety: 'Wynajęty',
-  w_trakcie_wydania: 'W trakcie wydania',
-}
+  wolny: "Wolny",
+  wynajety: "Wynajęty",
+  w_trakcie_wydania: "W trakcie wydania",
+};
 
 /** Sortowanie po polsku, z liczbami w kolejnosci naturalnej: 2 przed 10. */
 function porownaj(a: string, b: string): number {
-  return a.localeCompare(b, 'pl', { numeric: true, sensitivity: 'base' })
+  return a.localeCompare(b, "pl", { numeric: true, sensitivity: "base" });
 }
 
 /** Ta sama lista, co w tabeli. Dwie kopie rozjechalyby sie po pierwszej zmianie. */
-const TYPY_LOKALU = Object.entries(ETYKIETY_TYPU).map(([wartosc, etykieta]) => ({
-  wartosc,
-  etykieta,
-}))
+const TYPY_LOKALU = Object.entries(ETYKIETY_TYPU).map(
+  ([wartosc, etykieta]) => ({
+    wartosc,
+    etykieta,
+  }),
+);
 
 /**
  * Kartoteka: budynki, lokale i najemcy.
@@ -64,19 +65,13 @@ const TYPY_LOKALU = Object.entries(ETYKIETY_TYPU).map(([wartosc, etykieta]) => (
  * przypadkowa — bez budynku nie ma lokalu, bez lokalu i najemcy nie ma umowy.
  */
 export default function Kartoteka() {
-  const [parametry, setParametry] = useSearchParams()
-  const profil = useProfil()
-  const rola = profil.data?.rola
-
-  const mozeZarzadzac = rola === 'zarzadca' || rola === 'administrator'
-  const mozeBudynki = rola === 'administrator'
-
+  const [parametry, setParametry] = useSearchParams();
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">Kartoteka</h1>
 
       <Tabs
-        value={parametry.get('zakladka') ?? 'lokale'}
+        value={parametry.get("zakladka") ?? "lokale"}
         onValueChange={(w) => setParametry({ zakladka: w }, { replace: true })}
       >
         <TabsList>
@@ -86,15 +81,15 @@ export default function Kartoteka() {
 
         <div className="mt-4">
           <TabsContent value="lokale">
-            <ListaLokali mozeDodawac={mozeZarzadzac} mozeBudynki={mozeBudynki} />
+            <ListaLokali />
           </TabsContent>
           <TabsContent value="najemcy">
-            <ListaNajemcow mozeDodawac={mozeZarzadzac} />
+            <ListaNajemcow />
           </TabsContent>
         </div>
       </Tabs>
     </div>
-  )
+  );
 }
 
 // -------------------------------------------------- budynki wraz z lokalami
@@ -106,61 +101,63 @@ export default function Kartoteka() {
  * co jest w ktorym budynku — trzeba bylo skakac miedzy widokami. Budynek jest
  * naglowkiem, nie osobna lista.
  */
-function ListaLokali({
-  mozeDodawac,
-  mozeBudynki,
-}: {
-  mozeDodawac: boolean
-  mozeBudynki: boolean
-}) {
-  const lokale = useLokale({ limit: 500 })
-  const budynki = useBudynki()
-  const [otwartyLokal, setOtwartyLokal] = useState(false)
-  const [otwartyBudynek, setOtwartyBudynek] = useState(false)
+function ListaLokali() {
+  const lokale = useLokale({ limit: 500 });
+  const budynki = useBudynki();
+  const [otwartyLokal, setOtwartyLokal] = useState(false);
+  const [otwartyBudynek, setOtwartyBudynek] = useState(false);
 
-  if (lokale.isPending || budynki.isPending) return <Ladowanie wierszy={4} />
+  if (lokale.isPending || budynki.isPending) return <Ladowanie wierszy={4} />;
   if (lokale.isError) {
     return (
       <Blad
-        komunikat={lokale.error instanceof Error ? lokale.error.message : 'Nieznany błąd.'}
+        komunikat={
+          lokale.error instanceof Error
+            ? lokale.error.message
+            : "Nieznany błąd."
+        }
         ponow={() => void lokale.refetch()}
       />
-    )
+    );
   }
   if (budynki.isError) {
     return (
       <Blad
-        komunikat={budynki.error instanceof Error ? budynki.error.message : 'Nieznany błąd.'}
+        komunikat={
+          budynki.error instanceof Error
+            ? budynki.error.message
+            : "Nieznany błąd."
+        }
         ponow={() => void budynki.refetch()}
       />
-    )
+    );
   }
 
-  const listaBudynkow = [...budynki.data.pozycje].sort((a, b) => porownaj(a.nazwa, b.nazwa))
-  const brakBudynkow = listaBudynkow.length === 0
+  const listaBudynkow = [...budynki.data.pozycje].sort((a, b) =>
+    porownaj(a.nazwa, b.nazwa),
+  );
+  const brakBudynkow = listaBudynkow.length === 0;
 
   // Budynek bez lokali tez musi byc widoczny, inaczej wyglada na nieistniejacy.
-  const wedlugBudynku = new Map<number, LokalNaLiscie[]>(listaBudynkow.map((b) => [b.id, []]))
+  const wedlugBudynku = new Map<number, LokalNaLiscie[]>(
+    listaBudynkow.map((b) => [b.id, []]),
+  );
   for (const l of lokale.data.pozycje) {
-    wedlugBudynku.get(l.budynek_id)?.push(l)
+    wedlugBudynku.get(l.budynek_id)?.push(l);
   }
   for (const grupa of wedlugBudynku.values()) {
-    grupa.sort((a, b) => porownaj(a.oznaczenie, b.oznaczenie))
+    grupa.sort((a, b) => porownaj(a.oznaczenie, b.oznaczenie));
   }
 
   return (
     <div className="space-y-3">
       <div className="flex justify-end gap-2">
-        {mozeBudynki && (
-          <Button variant="outline" onClick={() => setOtwartyBudynek(true)}>
-            Dodaj budynek
-          </Button>
-        )}
-        {mozeDodawac && (
-          <Button onClick={() => setOtwartyLokal(true)} disabled={brakBudynkow}>
-            Dodaj lokal
-          </Button>
-        )}
+        <Button variant="outline" onClick={() => setOtwartyBudynek(true)}>
+          Dodaj budynek
+        </Button>
+        <Button onClick={() => setOtwartyLokal(true)} disabled={brakBudynkow}>
+          Dodaj lokal
+        </Button>
       </div>
 
       {brakBudynkow ? (
@@ -168,7 +165,9 @@ function ListaLokali({
           tytul="Nie ma jeszcze żadnego budynku"
           opis="Budynek jest pierwszą rzeczą do wprowadzenia. Bez niego nie da się dodać lokalu."
           akcja={
-            mozeBudynki ? <Button onClick={() => setOtwartyBudynek(true)}>Dodaj budynek</Button> : undefined
+            <Button onClick={() => setOtwartyBudynek(true)}>
+              Dodaj budynek
+            </Button>
           }
         />
       ) : (
@@ -185,7 +184,7 @@ function ListaLokali({
             </TableHeader>
             <TableBody>
               {listaBudynkow.map((b) => {
-                const grupa = wedlugBudynku.get(b.id) ?? []
+                const grupa = wedlugBudynku.get(b.id) ?? [];
                 return (
                   <Fragment key={b.id}>
                     {/*
@@ -202,10 +201,14 @@ function ListaLokali({
                             {b.nazwa}
                           </span>
                           {b.adres && (
-                            <span className="text-xs text-muted-foreground">{b.adres}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {b.adres}
+                            </span>
                           )}
                           <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                            {grupa.length === 0 ? 'bez lokali' : `lokali: ${grupa.length}`}
+                            {grupa.length === 0
+                              ? "bez lokali"
+                              : `lokali: ${grupa.length}`}
                           </span>
                           {!b.aktywny && (
                             <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
@@ -218,17 +221,19 @@ function ListaLokali({
 
                     {grupa.map((l) => (
                       <TableRow key={l.lokal_id}>
-                        <TableCell className="font-medium">{l.oznaczenie}</TableCell>
+                        <TableCell className="font-medium">
+                          {l.oznaczenie}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {ETYKIETY_TYPU[l.typ] ?? l.typ}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {l.powierzchnia_ewidencyjna
                             ? formatujPowierzchnie(l.powierzchnia_ewidencyjna)
-                            : '—'}
+                            : "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {l.najemca_nazwa ?? 'bez najemcy'}
+                          {l.najemca_nazwa ?? "bez najemcy"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {ETYKIETY_STATUSU[l.status_lokalu] ?? l.status_lokalu}
@@ -236,39 +241,56 @@ function ListaLokali({
                       </TableRow>
                     ))}
                   </Fragment>
-                )
+                );
               })}
             </TableBody>
           </Table>
         </div>
       )}
 
-      <FormularzBudynku otwarty={otwartyBudynek} onZamknij={() => setOtwartyBudynek(false)} />
+      <FormularzBudynku
+        otwarty={otwartyBudynek}
+        onZamknij={() => setOtwartyBudynek(false)}
+      />
       <FormularzLokalu
         otwarty={otwartyLokal}
         onZamknij={() => setOtwartyLokal(false)}
         budynki={listaBudynkow}
       />
     </div>
-  )
+  );
 }
 
-function FormularzBudynku({ otwarty, onZamknij }: { otwarty: boolean; onZamknij: () => void }) {
-  const dodaj = useDodajBudynek()
-  const [nazwa, setNazwa] = useState('')
-  const [adres, setAdres] = useState('')
+function FormularzBudynku({
+  otwarty,
+  onZamknij,
+}: {
+  otwarty: boolean;
+  onZamknij: () => void;
+}) {
+  const dodaj = useDodajBudynek();
+  const [nazwa, setNazwa] = useState("");
+  const [nazwaFolderu, setNazwaFolderu] = useState("");
+  const [adres, setAdres] = useState("");
 
   return (
     <DialogFormularza
       otwarty={otwarty}
       onZamknij={() => {
-        setNazwa('')
-        setAdres('')
-        onZamknij()
+        setNazwa("");
+        setNazwaFolderu("");
+        setAdres("");
+        onZamknij();
       }}
       tytul="Nowy budynek"
       onZapisz={() =>
-        dodaj.mutateAsync({ nazwa: nazwa.trim(), adres: pustyNaNull(adres), aktywny: true })
+        dodaj.mutateAsync({
+          nazwa: nazwa.trim(),
+          // Puste znaczy „folder nazywa się tak samo jak budynek".
+          nazwa_folderu: pustyNaNull(nazwaFolderu),
+          adres: pustyNaNull(adres),
+          aktywny: true,
+        })
       }
       zapisywanie={dodaj.isPending}
     >
@@ -280,9 +302,26 @@ function FormularzBudynku({ otwarty, onZamknij }: { otwarty: boolean; onZamknij:
         wymagane
         podpowiedz="Krótka, taka jakiej używacie na co dzień, na przykład 18A."
       />
-      <PoleTekstowe nazwa="adres" etykieta="Adres" wartosc={adres} onZmiana={setAdres} />
+      {/*
+        Bez tego pola nazwa budynku musiałaby być kopią nazwy katalogu na dysku
+        — czyli o wyglądzie kartoteki decydowałby układ folderów. Puste znaczy
+        „folder nazywa się tak samo", a to najczęstszy przypadek.
+      */}
+      <PoleTekstowe
+        nazwa="nazwa_folderu"
+        etykieta="Folder na dysku"
+        wartosc={nazwaFolderu}
+        onZmiana={setNazwaFolderu}
+        podpowiedz="Wypełnij tylko wtedy, gdy katalog nazywa się inaczej niż budynek."
+      />
+      <PoleTekstowe
+        nazwa="adres"
+        etykieta="Adres"
+        wartosc={adres}
+        onZmiana={setAdres}
+      />
     </DialogFormularza>
-  )
+  );
 }
 
 function FormularzLokalu({
@@ -290,23 +329,23 @@ function FormularzLokalu({
   onZamknij,
   budynki,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  budynki: Budynek[]
+  otwarty: boolean;
+  onZamknij: () => void;
+  budynki: Budynek[];
 }) {
-  const dodaj = useDodajLokal()
-  const [budynekId, setBudynekId] = useState('')
-  const [oznaczenie, setOznaczenie] = useState('')
-  const [typ, setTyp] = useState('')
-  const [powierzchnia, setPowierzchnia] = useState('')
+  const dodaj = useDodajLokal();
+  const [budynekId, setBudynekId] = useState("");
+  const [oznaczenie, setOznaczenie] = useState("");
+  const [typ, setTyp] = useState("");
+  const [powierzchnia, setPowierzchnia] = useState("");
 
   return (
     <DialogFormularza
       otwarty={otwarty}
       onZamknij={() => {
-        setOznaczenie('')
-        setPowierzchnia('')
-        onZamknij()
+        setOznaczenie("");
+        setPowierzchnia("");
+        onZamknij();
       }}
       tytul="Nowy lokal"
       onZapisz={() =>
@@ -314,7 +353,7 @@ function FormularzLokalu({
           budynek_id: Number(budynekId),
           oznaczenie: oznaczenie.trim(),
           typ,
-          status: 'wolny',
+          status: "wolny",
           powierzchnia_ewidencyjna: liczbaLubNull(powierzchnia),
         })
       }
@@ -326,7 +365,10 @@ function FormularzLokalu({
         wartosc={budynekId}
         onZmiana={setBudynekId}
         wymagane
-        opcje={budynki.map((b) => ({ wartosc: String(b.id), etykieta: b.nazwa }))}
+        opcje={budynki.map((b) => ({
+          wartosc: String(b.id),
+          etykieta: b.nazwa,
+        }))}
       />
       <PoleTekstowe
         nazwa="oznaczenie"
@@ -336,7 +378,14 @@ function FormularzLokalu({
         wymagane
         podpowiedz="Tak, jak lokal jest nazywany w umowach, na przykład 18A/12."
       />
-      <PoleWyboru nazwa="typ" etykieta="Typ" wartosc={typ} onZmiana={setTyp} wymagane opcje={TYPY_LOKALU} />
+      <PoleWyboru
+        nazwa="typ"
+        etykieta="Typ"
+        wartosc={typ}
+        onZmiana={setTyp}
+        wymagane
+        opcje={TYPY_LOKALU}
+      />
       <PoleTekstowe
         nazwa="powierzchnia"
         etykieta="Powierzchnia z ewidencji (m²)"
@@ -348,29 +397,33 @@ function FormularzLokalu({
         podpowiedz="Powierzchnia z umowy bywa inna. Tę drugą wprowadza się jako warunek umowy."
       />
     </DialogFormularza>
-  )
+  );
 }
 
 // ----------------------------------------------------------------- najemcy
 
-function ListaNajemcow({ mozeDodawac }: { mozeDodawac: boolean }) {
-  const najemcy = useNajemcy()
-  const [otwarty, setOtwarty] = useState(false)
+function ListaNajemcow() {
+  const najemcy = useNajemcy();
+  const [otwarty, setOtwarty] = useState(false);
 
-  if (najemcy.isPending) return <Ladowanie wierszy={3} />
+  if (najemcy.isPending) return <Ladowanie wierszy={3} />;
   if (najemcy.isError) {
     return (
       <Blad
-        komunikat={najemcy.error instanceof Error ? najemcy.error.message : 'Nieznany błąd.'}
+        komunikat={
+          najemcy.error instanceof Error
+            ? najemcy.error.message
+            : "Nieznany błąd."
+        }
         ponow={() => void najemcy.refetch()}
       />
-    )
+    );
   }
 
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        {mozeDodawac && <Button onClick={() => setOtwarty(true)}>Dodaj najemcę</Button>}
+        <Button onClick={() => setOtwarty(true)}>Dodaj najemcę</Button>
       </div>
 
       {najemcy.data.pozycje.length === 0 ? (
@@ -381,10 +434,15 @@ function ListaNajemcow({ mozeDodawac }: { mozeDodawac: boolean }) {
       ) : (
         <ul className="divide-y rounded-lg border bg-background">
           {najemcy.data.pozycje.map((n: Najemca) => (
-            <li key={n.id} className="flex flex-wrap items-center gap-4 px-3 py-2.5 text-sm">
+            <li
+              key={n.id}
+              className="flex flex-wrap items-center gap-4 px-3 py-2.5 text-sm"
+            >
               <span className="min-w-64 font-medium">{n.nazwa_pelna}</span>
-              <span className="text-muted-foreground">{n.nip ? `NIP ${n.nip}` : '—'}</span>
-              <span className="text-muted-foreground">{n.email ?? ''}</span>
+              <span className="text-muted-foreground">
+                {n.nip ? `NIP ${n.nip}` : "—"}
+              </span>
+              <span className="text-muted-foreground">{n.email ?? ""}</span>
             </li>
           ))}
         </ul>
@@ -392,28 +450,34 @@ function ListaNajemcow({ mozeDodawac }: { mozeDodawac: boolean }) {
 
       <FormularzNajemcy otwarty={otwarty} onZamknij={() => setOtwarty(false)} />
     </div>
-  )
+  );
 }
 
-function FormularzNajemcy({ otwarty, onZamknij }: { otwarty: boolean; onZamknij: () => void }) {
-  const dodaj = useDodajNajemce()
-  const [nazwa, setNazwa] = useState('')
-  const [nip, setNip] = useState('')
-  const [osobaFizyczna, setOsobaFizyczna] = useState(false)
-  const [adres, setAdres] = useState('')
-  const [email, setEmail] = useState('')
-  const [telefon, setTelefon] = useState('')
+function FormularzNajemcy({
+  otwarty,
+  onZamknij,
+}: {
+  otwarty: boolean;
+  onZamknij: () => void;
+}) {
+  const dodaj = useDodajNajemce();
+  const [nazwa, setNazwa] = useState("");
+  const [nip, setNip] = useState("");
+  const [osobaFizyczna, setOsobaFizyczna] = useState(false);
+  const [adres, setAdres] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefon, setTelefon] = useState("");
 
   return (
     <DialogFormularza
       otwarty={otwarty}
       onZamknij={() => {
-        setNazwa('')
-        setNip('')
-        setAdres('')
-        setEmail('')
-        setTelefon('')
-        onZamknij()
+        setNazwa("");
+        setNip("");
+        setAdres("");
+        setEmail("");
+        setTelefon("");
+        onZamknij();
       }}
       tytul="Nowy najemca"
       opis="Dane poufne. Wprowadza je człowiek, nigdy ekstrakcja z dokumentu."
@@ -443,15 +507,31 @@ function FormularzNajemcy({ otwarty, onZamknij }: { otwarty: boolean; onZamknij:
         onZmiana={setOsobaFizyczna}
         podpowiedz="Wpływa na zakres obowiązków wynikających z RODO."
       />
-      <PoleTekstowe nazwa="nip" etykieta="NIP" wartosc={nip} onZmiana={setNip} />
+      <PoleTekstowe
+        nazwa="nip"
+        etykieta="NIP"
+        wartosc={nip}
+        onZmiana={setNip}
+      />
       <PoleTekstowe
         nazwa="adres_siedziby"
         etykieta="Adres siedziby"
         wartosc={adres}
         onZmiana={setAdres}
       />
-      <PoleTekstowe nazwa="email" etykieta="E-mail" typ="email" wartosc={email} onZmiana={setEmail} />
-      <PoleTekstowe nazwa="telefon" etykieta="Telefon" wartosc={telefon} onZmiana={setTelefon} />
+      <PoleTekstowe
+        nazwa="email"
+        etykieta="E-mail"
+        typ="email"
+        wartosc={email}
+        onZmiana={setEmail}
+      />
+      <PoleTekstowe
+        nazwa="telefon"
+        etykieta="Telefon"
+        wartosc={telefon}
+        onZmiana={setTelefon}
+      />
     </DialogFormularza>
-  )
+  );
 }

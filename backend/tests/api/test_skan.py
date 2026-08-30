@@ -18,13 +18,10 @@ from sqlalchemy.orm import Session
 from najem.config import ustawienia
 from najem.domena.slowniki import (
     BazaOkresuNajmu,
-    RolaUzytkownika,
     StatusOkresuNajmu,
     TrybPrzechowywania,
 )
 from najem.modele import Budynek, Dokument, Lokal, Najemca, OkresNajmu
-
-from .conftest import zaloguj_jako
 
 pytestmark = pytest.mark.integracja
 
@@ -46,11 +43,11 @@ def katalog_skanu(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[P
 def bez_katalogu(monkeypatch: pytest.MonkeyPatch) -> None:
     """Program bez wskazanego katalogu skanu.
 
-    Podmieniamy funkcje, a nie zmienna srodowiskowa: KATALOG_SKANU moze byc
-    ustawione w pliku .env, a wtedy samo `delenv` niczego by nie zdjelo
+    Podmieniamy funkcje, a nie zmienna srodowiskowa: katalog moze byc ustawiony
+    w bazie albo w pliku .env, a wtedy samo `delenv` niczego by nie zdjelo
     i test przechodzilby albo nie w zaleznosci od konfiguracji maszyny.
     """
-    monkeypatch.setattr("najem.api.v1.skan._katalog", lambda: None)
+    monkeypatch.setattr("najem.api.v1.skan.katalog_skanu", lambda _baza: None)
 
 
 @pytest.fixture
@@ -77,7 +74,6 @@ def zbuduj_drzewo(korzen: Path, budynek: str = "18A", lokal: str = "Lokal nr 12_
 
 @pytest.fixture
 def operator(klient: TestClient, baza: Session) -> TestClient:
-    zaloguj_jako(klient, baza, RolaUzytkownika.OPERATOR)
     return klient
 
 
@@ -457,21 +453,6 @@ class TestPrzegladOdnosnikow:
         assert "inną treść" in zerwane[0]["powod"]
 
 
-class TestUprawnienia:
-    def test_podglad_nie_importuje(
-        self, klient: TestClient, baza: Session, katalog_skanu: Path
-    ) -> None:
-        zaloguj_jako(klient, baza, RolaUzytkownika.PODGLAD)
-        odpowiedz = klient.post(
-            "/api/v1/skan/importuj",
-            json={"sciezka_wzgledna": "cokolwiek.pdf", "typ": "umowa"},
-        )
-        assert odpowiedz.status_code == 403
-
-    def test_bez_logowania_nie_ma_skanu(self, klient: TestClient, katalog_skanu: Path) -> None:
-        assert klient.get("/api/v1/skan").status_code == 401
-
-
 class TestSladWAudycie:
     def test_import_zostawia_slad(
         self, operator: TestClient, katalog_skanu: Path, umowa: OkresNajmu, baza: Session
@@ -524,3 +505,92 @@ class TestOdpornoscNaDysk:
         tresc = odpowiedz.json()
         assert tresc["niedostepnych"] >= 1, "pominiecie ma byc policzone, nie przemilczane"
         assert tresc["nowych"] == 1, "dokumenty z czytelnych folderow maja byc widoczne"
+
+
+class TestUstawianieKatalogu:
+    """Katalog wskazuje sie w interfejsie, nie w pliku .env.
+
+    Wymaganie edycji pliku tekstowego od osoby, ktora ma obslugiwac umowy,
+    bylo przerzucaniem na nia pracy administratora.
+    """
+
+    def test_administrator_ustawia_katalog(
+        self, klient: TestClient, baza: Session, tmp_path: Path
+    ) -> None:
+        docelowy = tmp_path / "Budynki"
+        docelowy.mkdir()
+
+        odpowiedz = klient.put("/api/v1/skan/katalog", json={"sciezka": str(docelowy)})
+
+        assert odpowiedz.status_code == 200, odpowiedz.text
+        tresc = odpowiedz.json()
+        assert tresc["zrodlo"] == "baza"
+        assert tresc["istnieje"] is True
+        assert Path(tresc["sciezka"]) == docelowy
+
+    def test_ustawienie_z_bazy_wygrywa_z_plikiem(
+        self, klient: TestClient, baza: Session, katalog_skanu: Path, tmp_path: Path
+    ) -> None:
+        """Fixture ustawia KATALOG_SKANU w srodowisku; wpis w bazie ma go przykryc."""
+        inny = tmp_path / "Inne budynki"
+        inny.mkdir()
+        zbuduj_drzewo(inny, budynek="Rycerska")
+
+        klient.put("/api/v1/skan/katalog", json={"sciezka": str(inny)})
+
+        skan = klient.get("/api/v1/skan").json()
+        assert Path(skan["katalog"]) == inny
+        assert skan["budynki"][0]["nazwa_folderu"] == "Rycerska"
+
+    def test_literowka_w_sciezce_wykryta_od_razu(
+        self, klient: TestClient, baza: Session, tmp_path: Path
+    ) -> None:
+        """Najczestszy blad przy tym polu. Wykryty przy zapisie kosztuje poprawke
+        jednego znaku zamiast szukania, czemu skan nic nie znajduje."""
+
+        odpowiedz = klient.put(
+            "/api/v1/skan/katalog", json={"sciezka": str(tmp_path / "nie ma takiego")}
+        )
+
+        assert odpowiedz.status_code == 422
+        assert "nie istnieje" in odpowiedz.json()["detail"]
+
+    def test_sciezka_wzgledna_odrzucona(self, klient: TestClient, baza: Session) -> None:
+
+        odpowiedz = klient.put("/api/v1/skan/katalog", json={"sciezka": "Dokumenty/Budynki"})
+
+        assert odpowiedz.status_code == 422
+        assert "pełną ścieżkę" in odpowiedz.json()["detail"]
+
+    def test_plik_zamiast_katalogu(self, klient: TestClient, baza: Session, tmp_path: Path) -> None:
+        plik = tmp_path / "umowa.pdf"
+        plik.write_bytes(PDF)
+
+        odpowiedz = klient.put("/api/v1/skan/katalog", json={"sciezka": str(plik)})
+
+        assert odpowiedz.status_code == 422
+        assert "katalog" in odpowiedz.json()["detail"]
+
+    def test_operator_widzi_ktory_katalog_jest_ustawiony(
+        self, klient: TestClient, baza: Session, katalog_skanu: Path
+    ) -> None:
+        """Odczyt tak, zapis nie: operator musi wiedziec, gdzie program szuka."""
+
+        odpowiedz = klient.get("/api/v1/skan/katalog")
+
+        assert odpowiedz.status_code == 200
+        assert Path(odpowiedz.json()["sciezka"]) == katalog_skanu
+
+    def test_wyczyszczenie_wraca_do_pliku(
+        self, klient: TestClient, baza: Session, katalog_skanu: Path, tmp_path: Path
+    ) -> None:
+        inny = tmp_path / "Inne"
+        inny.mkdir()
+        klient.put("/api/v1/skan/katalog", json={"sciezka": str(inny)})
+
+        odpowiedz = klient.delete("/api/v1/skan/katalog")
+
+        assert odpowiedz.status_code == 200
+        tresc = odpowiedz.json()
+        assert tresc["zrodlo"] == "plik"
+        assert Path(tresc["sciezka"]) == katalog_skanu

@@ -1,69 +1,69 @@
-import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { BladApi, pobierz, wyslij } from '@/api/klient'
+import { BladApi, pobierz, wyslij } from "@/api/klient";
 import {
   BRAK_DANYCH,
   formatujDate,
   formatujKwote,
   formatujProcent,
   formatujRoznice,
-} from '@/funkcje/format'
-import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
-import { PoleTekstowe, PoleWyboru } from '@/komponenty/Formularz'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from "@/funkcje/format";
+import { Blad, Ladowanie, Pusto } from "@/komponenty/Stany";
+import { PoleTekstowe, PoleWyboru } from "@/komponenty/Formularz";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Wskaznik {
-  id: number
-  rok: number
-  rodzaj: string
-  wartosc_procent: string
-  data_publikacji: string | null
+  id: number;
+  rok: number;
+  rodzaj: string;
+  wartosc_procent: string;
+  data_publikacji: string | null;
 }
 
 interface Pozycja {
-  okres_najmu_id: number
-  lokal_id: number
-  oznaczenie_lokalu: string
-  najemca: string
-  kwota_stara: string | null
-  kwota_nowa: string | null
-  roznica: string | null
-  waluta: string | null
-  rodzaj_kwoty: string | null
-  wskaznik_procent: string | null
-  obowiazuje_od: string | null
-  powod_wylaczenia: string | null
+  okres_najmu_id: number;
+  lokal_id: number;
+  oznaczenie_lokalu: string;
+  najemca: string;
+  kwota_stara: string | null;
+  kwota_nowa: string | null;
+  roznica: string | null;
+  waluta: string | null;
+  rodzaj_kwoty: string | null;
+  wskaznik_procent: string | null;
+  obowiazuje_od: string | null;
+  powod_wylaczenia: string | null;
 }
 
 interface Suma {
-  waluta: string
-  umow: number
-  przed: string
-  po: string
-  roznica: string
+  waluta: string;
+  umow: number;
+  przed: string;
+  po: string;
+  roznica: string;
 }
 
 interface Przebieg {
-  rok: number
-  wskazniki: Record<string, string>
-  objete: Pozycja[]
-  wylaczone: Pozycja[]
-  sumy: Suma[]
+  rok: number;
+  wskazniki: Record<string, string>;
+  objete: Pozycja[];
+  wylaczone: Pozycja[];
+  sumy: Suma[];
 }
 
 const RODZAJE = [
-  { wartosc: 'gus_rok_do_roku', etykieta: 'GUS rok do roku' },
-  { wartosc: 'gus_srednioroczny', etykieta: 'GUS średnioroczny' },
-]
+  { wartosc: "gus_rok_do_roku", etykieta: "GUS rok do roku" },
+  { wartosc: "gus_srednioroczny", etykieta: "GUS średnioroczny" },
+];
 
 const NAZWY_RODZAJOW: Record<string, string> = {
-  gus_rok_do_roku: 'GUS rok do roku',
-  gus_srednioroczny: 'GUS średnioroczny',
-  stala_stawka: 'stała stawka z umowy',
-}
+  gus_rok_do_roku: "GUS rok do roku",
+  gus_srednioroczny: "GUS średnioroczny",
+  stala_stawka: "stała stawka z umowy",
+};
 
 /**
  * Waloryzacja roczna (koncepcja, sekcja 7.6).
@@ -80,88 +80,102 @@ const NAZWY_RODZAJOW: Record<string, string> = {
  * nie liczy niczego na pieniądzach (reguła projektu).
  */
 export default function Waloryzacja() {
-  const kolejka = useQueryClient()
+  const kolejka = useQueryClient();
   // Rok trzymamy jako tekst. Number('') to 0, a `rok=0` to 422 z serwera
   // pokazane użytkownikowi tylko dlatego, że skasował pole, żeby wpisać
   // inną wartość. Do zapytań idzie dopiero wartość z dozwolonego zakresu.
-  const [rokTekst, setRokTekst] = useState(() => String(new Date().getFullYear()))
-  const [odznaczone, setOdznaczone] = useState<Set<number>>(new Set())
-  const [wynik, setWynik] = useState<{ umow: number; weksle: number } | null>(null)
-  const [blad, setBlad] = useState<string | null>(null)
+  const [rokTekst, setRokTekst] = useState(() =>
+    String(new Date().getFullYear()),
+  );
+  const [odznaczone, setOdznaczone] = useState<Set<number>>(new Set());
+  const [wynik, setWynik] = useState<{ umow: number; weksle: number } | null>(
+    null,
+  );
+  const [blad, setBlad] = useState<string | null>(null);
 
-  const rok = poprawnyRok(rokTekst)
+  const rok = poprawnyRok(rokTekst);
 
   const wskazniki = useQuery({
-    queryKey: ['wskazniki', rok],
+    queryKey: ["wskazniki", rok],
     queryFn: () =>
-      pobierz<{ pozycje: Wskaznik[] }>('/waloryzacja/wskazniki', { rok }),
+      pobierz<{ pozycje: Wskaznik[] }>("/waloryzacja/wskazniki", { rok }),
     enabled: rok !== null,
-  })
+  });
 
   const przebieg = useQuery({
-    queryKey: ['przebieg-waloryzacji', rok],
-    queryFn: () => pobierz<Przebieg>('/waloryzacja/przebieg', { rok }),
+    queryKey: ["przebieg-waloryzacji", rok],
+    queryFn: () => pobierz<Przebieg>("/waloryzacja/przebieg", { rok }),
     enabled: rok !== null,
-  })
+  });
 
-  const objete = useMemo(() => przebieg.data?.objete ?? [], [przebieg.data])
+  const objete = useMemo(() => przebieg.data?.objete ?? [], [przebieg.data]);
 
   // Domyślnie zaznaczone jest wszystko, bo zatwierdzanie całości jest częstsze
   // niż wybieranie pojedynczych umów. Trzymamy więc zbiór odznaczonych.
   const doZatwierdzenia = useMemo(
     () => objete.filter((p) => !odznaczone.has(p.okres_najmu_id)),
     [objete, odznaczone],
-  )
-  const identyfikatory = doZatwierdzenia.map((p) => p.okres_najmu_id)
+  );
+  const identyfikatory = doZatwierdzenia.map((p) => p.okres_najmu_id);
 
   const sumy = useQuery({
     // Klucz z posortowanych identyfikatorów: ten sam wybór to ten sam wynik,
     // więc odznaczenie i ponowne zaznaczenie nie wywołuje zapytania.
-    queryKey: ['podsumowanie-waloryzacji', rok, [...identyfikatory].sort((a, b) => a - b)],
+    queryKey: [
+      "podsumowanie-waloryzacji",
+      rok,
+      [...identyfikatory].sort((a, b) => a - b),
+    ],
     queryFn: () =>
-      wyslij<Suma[]>('/waloryzacja/podsumowanie', { rok, okresy_najmu: identyfikatory }),
+      wyslij<Suma[]>("/waloryzacja/podsumowanie", {
+        rok,
+        okresy_najmu: identyfikatory,
+      }),
     enabled: rok !== null && objete.length > 0,
     placeholderData: (poprzednie) => poprzednie,
-  })
+  });
 
   const zatwierdzenie = useMutation({
     mutationFn: (okresy: number[]) =>
       wyslij<{ umow_zwaloryzowanych: number; zdarzen_o_wekslach: number }>(
-        '/waloryzacja/zatwierdz',
+        "/waloryzacja/zatwierdz",
         { rok, okresy_najmu: okresy },
       ),
     onSuccess: (odp) => {
-      setWynik({ umow: odp.umow_zwaloryzowanych, weksle: odp.zdarzen_o_wekslach })
-      setOdznaczone(new Set())
+      setWynik({
+        umow: odp.umow_zwaloryzowanych,
+        weksle: odp.zdarzen_o_wekslach,
+      });
+      setOdznaczone(new Set());
       // Waloryzacja zmienia czynsze, więc nieaktualne są też kartoteka,
       // profile lokali i kokpit terminów. Unieważniamy, a nie czyścimy:
       // `clear()` wyrzuca dane innych ekranów i wrzuca je w stan ładowania.
-      void kolejka.invalidateQueries()
+      void kolejka.invalidateQueries();
     },
     onError: (e) => {
-      setBlad(e instanceof BladApi ? e.message : 'Nie udało się zatwierdzić.')
+      setBlad(e instanceof BladApi ? e.message : "Nie udało się zatwierdzić.");
       // Serwer odrzuca zatwierdzenie, gdy lista propozycji jest już nieaktualna
       // (409). Kazanie użytkownikowi „odświeżyć listę" i nieodświeżanie jej
       // byłoby złośliwe — po takim błędzie pobieramy przebieg na nowo.
       if (e instanceof BladApi && e.konflikt) {
-        void kolejka.invalidateQueries({ queryKey: ['przebieg-waloryzacji'] })
-        setOdznaczone(new Set())
+        void kolejka.invalidateQueries({ queryKey: ["przebieg-waloryzacji"] });
+        setOdznaczone(new Set());
       }
     },
-  })
+  });
 
   function przelacz(id: number) {
-    const nowe = new Set(odznaczone)
-    if (nowe.has(id)) nowe.delete(id)
-    else nowe.add(id)
-    setOdznaczone(nowe)
+    const nowe = new Set(odznaczone);
+    if (nowe.has(id)) nowe.delete(id);
+    else nowe.add(id);
+    setOdznaczone(nowe);
   }
 
   function zmienRok(nowy: string) {
-    setRokTekst(nowy)
-    setOdznaczone(new Set())
-    setWynik(null)
-    setBlad(null)
+    setRokTekst(nowy);
+    setOdznaczone(new Set());
+    setWynik(null);
+    setBlad(null);
   }
 
   return (
@@ -170,8 +184,8 @@ export default function Waloryzacja() {
         <div>
           <h1 className="text-lg font-semibold">Waloryzacja roczna</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Wskaźnik wprowadzasz raz. System policzy propozycje dla wszystkich umów,
-            które mu podlegają.
+            Wskaźnik wprowadzasz raz. System policzy propozycje dla wszystkich
+            umów, które mu podlegają.
           </p>
         </div>
 
@@ -203,13 +217,15 @@ export default function Waloryzacja() {
       {wynik && (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900">
           <p className="font-medium">
-            Zwaloryzowano {wynik.umow} {slowoUmowa(wynik.umow)}. Listę zmian
-            do pism dla najemców pobierzesz przyciskiem „Pobierz listę zmian" u góry.
+            Zwaloryzowano {wynik.umow} {slowoUmowa(wynik.umow)}. Listę zmian do
+            pism dla najemców pobierzesz przyciskiem „Pobierz listę zmian" u
+            góry.
           </p>
           {wynik.weksle > 0 && (
             <p className="mt-1">
-              Powstało {wynik.weksle} {wynik.weksle === 1 ? 'zdarzenie' : 'zdarzeń'} o
-              zabezpieczeniach do przeliczenia. Znajdziesz je w Terminach.
+              Powstało {wynik.weksle}{" "}
+              {wynik.weksle === 1 ? "zdarzenie" : "zdarzeń"} o zabezpieczeniach
+              do przeliczenia. Znajdziesz je w Terminach.
             </p>
           )}
         </div>
@@ -233,7 +249,7 @@ export default function Waloryzacja() {
           komunikat={
             przebieg.error instanceof Error
               ? przebieg.error.message
-              : 'Nie udało się wczytać przebiegu.'
+              : "Nie udało się wczytać przebiegu."
           }
           ponow={() => void przebieg.refetch()}
         />
@@ -245,7 +261,7 @@ export default function Waloryzacja() {
           opis={
             Object.keys(przebieg.data.wskazniki).length === 0
               ? `Najpierw wprowadź wskaźnik na rok ${rok}.`
-              : 'Sprawdź listę wyłączeń poniżej — każda pozycja ma podany powód.'
+              : "Sprawdź listę wyłączeń poniżej — każda pozycja ma podany powód."
           }
         />
       )}
@@ -277,19 +293,23 @@ export default function Waloryzacja() {
                   </th>
                   <th className="px-3 py-2 font-medium">Lokal</th>
                   <th className="px-3 py-2 font-medium">Najemca</th>
-                  <th className="px-3 py-2 text-right font-medium">Czynsz teraz</th>
-                  <th className="px-3 py-2 text-right font-medium">Po waloryzacji</th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    Czynsz teraz
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    Po waloryzacji
+                  </th>
                   <th className="px-3 py-2 text-right font-medium">Różnica</th>
                   <th className="px-3 py-2 font-medium">Od kiedy</th>
                 </tr>
               </thead>
               <tbody>
                 {objete.map((p) => {
-                  const zaznaczona = !odznaczone.has(p.okres_najmu_id)
+                  const zaznaczona = !odznaczone.has(p.okres_najmu_id);
                   return (
                     <tr
                       key={p.okres_najmu_id}
-                      className={`border-b last:border-b-0 ${zaznaczona ? '' : 'opacity-50'}`}
+                      className={`border-b last:border-b-0 ${zaznaczona ? "" : "opacity-50"}`}
                     >
                       <td className="px-3 py-2.5">
                         <input
@@ -300,16 +320,18 @@ export default function Waloryzacja() {
                           onChange={() => przelacz(p.okres_najmu_id)}
                         />
                       </td>
-                      <td className="px-3 py-2.5 font-medium">{p.oznaczenie_lokalu}</td>
+                      <td className="px-3 py-2.5 font-medium">
+                        {p.oznaczenie_lokalu}
+                      </td>
                       <td className="px-3 py-2.5">{p.najemca}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {p.kwota_stara
-                          ? formatujKwote(p.kwota_stara, p.waluta ?? 'PLN')
+                          ? formatujKwote(p.kwota_stara, p.waluta ?? "PLN")
                           : BRAK_DANYCH}
                       </td>
                       <td className="px-3 py-2.5 text-right font-medium tabular-nums">
                         {p.kwota_nowa
-                          ? formatujKwote(p.kwota_nowa, p.waluta ?? 'PLN')
+                          ? formatujKwote(p.kwota_nowa, p.waluta ?? "PLN")
                           : BRAK_DANYCH}
                         {p.rodzaj_kwoty && (
                           <span className="ml-1.5 text-xs font-normal text-muted-foreground">
@@ -321,12 +343,14 @@ export default function Waloryzacja() {
                         className={`px-3 py-2.5 text-right tabular-nums ${kolorZmiany(p.roznica)}`}
                       >
                         {p.roznica
-                          ? formatujRoznice(p.roznica, p.waluta ?? 'PLN')
+                          ? formatujRoznice(p.roznica, p.waluta ?? "PLN")
                           : BRAK_DANYCH}
                       </td>
-                      <td className="px-3 py-2.5">{formatujDate(p.obowiazuje_od)}</td>
+                      <td className="px-3 py-2.5">
+                        {formatujDate(p.obowiazuje_od)}
+                      </td>
                     </tr>
-                  )
+                  );
                 })}
               </tbody>
             </table>
@@ -338,18 +362,18 @@ export default function Waloryzacja() {
             <Button
               disabled={doZatwierdzenia.length === 0 || zatwierdzenie.isPending}
               onClick={() => {
-                setBlad(null)
-                setWynik(null)
-                zatwierdzenie.mutate(identyfikatory)
+                setBlad(null);
+                setWynik(null);
+                zatwierdzenie.mutate(identyfikatory);
               }}
             >
               {zatwierdzenie.isPending
-                ? 'Zapisuję…'
+                ? "Zapisuję…"
                 : `Zatwierdź ${doZatwierdzenia.length} ${slowoUmowa(doZatwierdzenia.length)}`}
             </Button>
             <span className="text-sm text-muted-foreground">
-              Zatwierdzenie zakłada nowy czynsz obowiązujący od miesiąca waloryzacji.
-              Poprzednia kwota zostaje w historii.
+              Zatwierdzenie zakłada nowy czynsz obowiązujący od miesiąca
+              waloryzacji. Poprzednia kwota zostaje w historii.
             </span>
           </div>
         </section>
@@ -366,8 +390,12 @@ export default function Waloryzacja() {
                 key={p.okres_najmu_id}
                 className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-3 py-2.5"
               >
-                <span className="w-24 shrink-0 font-medium">{p.oznaczenie_lokalu}</span>
-                <span className="w-56 shrink-0 text-muted-foreground">{p.najemca}</span>
+                <span className="w-24 shrink-0 font-medium">
+                  {p.oznaczenie_lokalu}
+                </span>
+                <span className="w-56 shrink-0 text-muted-foreground">
+                  {p.najemca}
+                </span>
                 <span className="text-muted-foreground">
                   {p.powod_wylaczenia ?? BRAK_DANYCH}
                 </span>
@@ -377,7 +405,7 @@ export default function Waloryzacja() {
         </section>
       )}
     </div>
-  )
+  );
 }
 
 /** Podgląd sumy zmian. Kwoty przychodzą policzone z serwera, w rozbiciu na waluty. */
@@ -387,7 +415,7 @@ function Podsumowanie({ sumy }: { sumy: Suma[] }) {
       <p className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
         Nic nie zaznaczono — nie ma czego zatwierdzić.
       </p>
-    )
+    );
   }
 
   return (
@@ -405,7 +433,9 @@ function Podsumowanie({ sumy }: { sumy: Suma[] }) {
               <td className="px-3 py-2.5 text-right font-medium tabular-nums">
                 {formatujKwote(s.po, s.waluta)}
               </td>
-              <td className={`px-3 py-2.5 text-right tabular-nums ${kolorZmiany(s.roznica)}`}>
+              <td
+                className={`px-3 py-2.5 text-right tabular-nums ${kolorZmiany(s.roznica)}`}
+              >
                 {formatujRoznice(s.roznica, s.waluta)}
               </td>
             </tr>
@@ -413,30 +443,44 @@ function Podsumowanie({ sumy }: { sumy: Suma[] }) {
         </tbody>
       </table>
     </div>
-  )
+  );
 }
 
-function PanelWskaznika({ rok, wskazniki }: { rok: number; wskazniki: Wskaznik[] }) {
-  const kolejka = useQueryClient()
-  const [rodzaj, setRodzaj] = useState('gus_rok_do_roku')
-  const [wartosc, setWartosc] = useState('')
-  const [blad, setBlad] = useState<string | null>(null)
+function PanelWskaznika({
+  rok,
+  wskazniki,
+}: {
+  rok: number;
+  wskazniki: Wskaznik[];
+}) {
+  const kolejka = useQueryClient();
+  const [rodzaj, setRodzaj] = useState("gus_rok_do_roku");
+  const [wartosc, setWartosc] = useState("");
+  const [blad, setBlad] = useState<string | null>(null);
 
-  const procent = poprawnyProcent(wartosc)
+  const procent = poprawnyProcent(wartosc);
 
   const dodaj = useMutation({
     mutationFn: (wartosc_procent: string) =>
-      wyslij<Wskaznik>('/waloryzacja/wskazniki', { rok, rodzaj, wartosc_procent }),
+      wyslij<Wskaznik>("/waloryzacja/wskazniki", {
+        rok,
+        rodzaj,
+        wartosc_procent,
+      }),
     onSuccess: () => {
-      setWartosc('')
-      setBlad(null)
-      void kolejka.invalidateQueries({ queryKey: ['wskazniki'] })
-      void kolejka.invalidateQueries({ queryKey: ['przebieg-waloryzacji'] })
-      void kolejka.invalidateQueries({ queryKey: ['podsumowanie-waloryzacji'] })
+      setWartosc("");
+      setBlad(null);
+      void kolejka.invalidateQueries({ queryKey: ["wskazniki"] });
+      void kolejka.invalidateQueries({ queryKey: ["przebieg-waloryzacji"] });
+      void kolejka.invalidateQueries({
+        queryKey: ["podsumowanie-waloryzacji"],
+      });
     },
     onError: (e) =>
-      setBlad(e instanceof BladApi ? e.message : 'Nie udało się zapisać wskaźnika.'),
-  })
+      setBlad(
+        e instanceof BladApi ? e.message : "Nie udało się zapisać wskaźnika.",
+      ),
+  });
 
   return (
     <section className="space-y-3 rounded-lg border bg-background p-4">
@@ -449,8 +493,11 @@ function PanelWskaznika({ rok, wskazniki }: { rok: number; wskazniki: Wskaznik[]
       ) : (
         <ul className="flex flex-wrap gap-2 text-sm">
           {wskazniki.map((w) => (
-            <li key={w.id} className="rounded-md border bg-muted/40 px-2.5 py-1">
-              {NAZWY_RODZAJOW[w.rodzaj] ?? w.rodzaj}:{' '}
+            <li
+              key={w.id}
+              className="rounded-md border bg-muted/40 px-2.5 py-1"
+            >
+              {NAZWY_RODZAJOW[w.rodzaj] ?? w.rodzaj}:{" "}
               <strong>{formatujProcent(w.wartosc_procent)}</strong>
               {w.data_publikacji && (
                 <span className="ml-2 text-xs text-muted-foreground">
@@ -465,12 +512,14 @@ function PanelWskaznika({ rok, wskazniki }: { rok: number; wskazniki: Wskaznik[]
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={(e) => {
-          e.preventDefault()
+          e.preventDefault();
           if (procent === null) {
-            setBlad('Wskaźnik musi być liczbą z zakresu od -50 do 100, np. 3,7.')
-            return
+            setBlad(
+              "Wskaźnik musi być liczbą z zakresu od -50 do 100, np. 3,7.",
+            );
+            return;
           }
-          dodaj.mutate(procent)
+          dodaj.mutate(procent);
         }}
       >
         <PoleWyboru
@@ -487,18 +536,22 @@ function PanelWskaznika({ rok, wskazniki }: { rok: number; wskazniki: Wskaznik[]
           etykieta="Wartość (%)"
           wartosc={wartosc}
           onZmiana={(v) => {
-            setWartosc(v)
-            setBlad(null)
+            setWartosc(v);
+            setBlad(null);
           }}
           inputMode="decimal"
           className="w-28"
           placeholder="3,70"
           wymagane
-          aria-invalid={wartosc !== '' && procent === null}
+          aria-invalid={wartosc !== "" && procent === null}
         />
 
-        <Button type="submit" variant="outline" disabled={dodaj.isPending || !wartosc}>
-          {dodaj.isPending ? 'Zapisuję…' : 'Wprowadź wskaźnik'}
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={dodaj.isPending || !wartosc}
+        >
+          {dodaj.isPending ? "Zapisuję…" : "Wprowadź wskaźnik"}
         </Button>
       </form>
 
@@ -513,11 +566,11 @@ function PanelWskaznika({ rok, wskazniki }: { rok: number; wskazniki: Wskaznik[]
         </p>
       )}
     </section>
-  )
+  );
 }
 
-const ROK_MIN = 2000
-const ROK_MAX = 2200
+const ROK_MIN = 2000;
+const ROK_MAX = 2200;
 
 /**
  * Rok z pola tekstowego albo null.
@@ -527,9 +580,9 @@ const ROK_MAX = 2200
  * nowej wartości.
  */
 function poprawnyRok(tekst: string): number | null {
-  if (!/^\d{4}$/.test(tekst.trim())) return null
-  const liczba = Number(tekst)
-  return liczba >= ROK_MIN && liczba <= ROK_MAX ? liczba : null
+  if (!/^\d{4}$/.test(tekst.trim())) return null;
+  const liczba = Number(tekst);
+  return liczba >= ROK_MIN && liczba <= ROK_MAX ? liczba : null;
 }
 
 /**
@@ -540,24 +593,25 @@ function poprawnyRok(tekst: string): number | null {
  * po komunikat Pydantica.
  */
 function poprawnyProcent(tekst: string): string | null {
-  const znormalizowany = tekst.trim().replace(',', '.')
-  if (!/^-?\d{1,3}(\.\d{1,2})?$/.test(znormalizowany)) return null
-  const liczba = Number(znormalizowany)
-  return liczba >= -50 && liczba <= 100 ? znormalizowany : null
+  const znormalizowany = tekst.trim().replace(",", ".");
+  if (!/^-?\d{1,3}(\.\d{1,2})?$/.test(znormalizowany)) return null;
+  const liczba = Number(znormalizowany);
+  return liczba >= -50 && liczba <= 100 ? znormalizowany : null;
 }
 
 /** Zieleń dla podwyżki, czerwień dla obniżki. Zero jest neutralne. */
 function kolorZmiany(roznica: string | null): string {
-  const liczba = Number(roznica ?? 0)
-  if (!Number.isFinite(liczba) || liczba === 0) return 'text-muted-foreground'
-  return liczba > 0 ? 'text-emerald-700' : 'text-red-700'
+  const liczba = Number(roznica ?? 0);
+  if (!Number.isFinite(liczba) || liczba === 0) return "text-muted-foreground";
+  return liczba > 0 ? "text-emerald-700" : "text-red-700";
 }
 
 /** Polska odmiana po liczebniku: 1 umowę, 2 umowy, 5 umów. */
 function slowoUmowa(ile: number): string {
-  if (ile === 1) return 'umowę'
-  const dziesiatki = ile % 100
-  const jednosci = ile % 10
-  if (jednosci >= 2 && jednosci <= 4 && !(dziesiatki >= 12 && dziesiatki <= 14)) return 'umowy'
-  return 'umów'
+  if (ile === 1) return "umowę";
+  const dziesiatki = ile % 100;
+  const jednosci = ile % 10;
+  if (jednosci >= 2 && jednosci <= 4 && !(dziesiatki >= 12 && dziesiatki <= 14))
+    return "umowy";
+  return "umów";
 }

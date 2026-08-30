@@ -13,9 +13,7 @@ from starlette.types import Scope
 
 from najem.api.bledy import zarejestruj_handlery
 from najem.api.v1 import router as router_v1
-from najem.baza import TworzSesje
 from najem.config import KATALOG_REPO, ustawienia
-from najem.uslugi.inicjalizacja import zapewnij_konto_administratora
 from najem.zadania.harmonogram import uruchom_harmonogram, zatrzymaj_harmonogram
 
 log = structlog.get_logger(__name__)
@@ -28,43 +26,11 @@ async def cykl_zycia(_: FastAPI) -> AsyncIterator[None]:
     Generator zdarzen jest idempotentny, wiec restart aplikacji w srodku dnia
     niczego nie dubluje ani nie gubi.
     """
-    _zaloz_konto_poczatkowe()
     uruchom_harmonogram()
     try:
         yield
     finally:
         zatrzymaj_harmonogram()
-
-
-def _zaloz_konto_poczatkowe() -> None:
-    """Przy pustej bazie zaklada administratora i pokazuje haslo raz.
-
-    Bledu nie podnosimy dalej: aplikacja ma wstac takze wtedy, gdy baza jeszcze
-    nie odpowiada, zeby endpoint /health mogl powiedziec, co jest nie tak.
-    """
-    try:
-        with TworzSesje() as sesja:
-            konto = zapewnij_konto_administratora(sesja)
-            sesja.commit()
-    except Exception:
-        log.warning("konto_poczatkowe_nieutworzone", powod="baza niedostępna przy starcie")
-        return
-
-    if konto is None:
-        return
-
-    ramka = "=" * 64
-    print("")
-    print(ramka)
-    print("  PIERWSZE URUCHOMIENIE: utworzono konto administratora")
-    print(ramka)
-    print(f"  Login:  {konto.login}")
-    print(f"  Hasło:  {konto.haslo}")
-    print("")
-    print("  Zapisz je teraz. Ten komunikat nie pojawi się ponownie.")
-    print("  Program poprosi o zmianę hasła przy pierwszym logowaniu.")
-    print(ramka)
-    print("")
 
 
 app = FastAPI(

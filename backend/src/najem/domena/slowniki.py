@@ -10,15 +10,6 @@ ktorej nikt nie rozszyfruje przy zagladaniu do bazy przez psql.
 from enum import StrEnum
 
 
-class RolaUzytkownika(StrEnum):
-    """Koncepcja, sekcja 7.9. Kolejnosc od najmniejszych uprawnien."""
-
-    PODGLAD = "podglad"
-    OPERATOR = "operator"
-    ZARZADCA = "zarzadca"
-    ADMINISTRATOR = "administrator"
-
-
 class TypLokalu(StrEnum):
     HANDLOWY = "handlowy"
     BIUROWY = "biurowy"

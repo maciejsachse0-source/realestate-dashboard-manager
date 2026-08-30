@@ -11,9 +11,18 @@ i **da się w nim pracować**: wprowadzić budynek, lokal, najemcę, umowę, war
 zabezpieczenia i przeglądy, zatwierdzić wartości, obsłużyć terminy, przeprowadzić
 waloryzację roczną.
 
-52 endpointy. Interfejs: logowanie, dashboard, kartoteka z formularzami,
+56 endpointów (było 62 — ubyły cztery z logowania, lista użytkowników
+i przypisywanie zdarzeń). Interfejs: dashboard, kartoteka z formularzami,
 kokpit terminów z filtrami i akcjami, profil lokalu z ośmioma zakładkami,
 kreator importu z arkusza, waloryzacja roczna.
+
+**Program nie ma logowania** ([ADR 009](decyzje/009-usuniecie-logowania.md),
+28.08.2026). Otwiera się od razu na dashboardzie. Zniknęły sesje, hasła, role
+i wszystkie kolumny z autorem operacji, razem z tabelami `uzytkownik`
+i `sesja_uzytkownika`. Audyt nadal zapisuje **co, kiedy i z jakiej wartości
+na jaką**, ale nie **kto** — to świadome odstępstwo od sekcji 8.1 koncepcji.
+Migracja `007_bez_logowania` jest nieodwracalna w sensie danych: `downgrade`
+odtwarza sam schemat, historia autorstwa przepada.
 
 **Po E8 system zastępuje Excela.** Wszystko dalej to poprawa efektywności,
 nie warunek działania.
@@ -28,16 +37,21 @@ Folder paruje się z umową raz, ręcznie; pominięty plik nie wraca przy kolejn
 skanie. Przycisk „Sprawdź odnośniki" wykrywa pliki przeniesione albo podmienione.
 **Skutek dla kopii zapasowych: backup musi obejmować bazę razem z katalogiem
 dokumentów użytkownika.**
+Ekran ma zakładkę **„Jak to działa"** z opisem mechanizmu: co program odczytuje
+z pliku (nazwę, sygnaturę pierwszych bajtów, SHA-256 treści), czego nie
+odczytuje i co z tego wynika. Powstała 28.08.2026 po pytaniu, na jakiej zasadzie
+program zczytuje zawartość dokumentów. Gdy zmieni się `domena/skan.py` albo
+`dokumenty/przechowalnia.py`, ten opis trzeba poprawić razem z kodem.
 
 Warstwa domenowa jest kompletna (reguły R1, R2, R4–R7, R9), pokrycie `domena/`
 wynosi 100%. Generator zdarzeń chodzi codziennie o 6:00 i jest idempotentny.
-Pięć migracji Alembica, jedna głowa.
+Siedem migracji Alembica, jedna głowa.
 
 Zastrzeżenie do R5: część liczbowa (wartość zabezpieczenia jako wielokrotność
 czynszu) **nie jest zaimplementowana**. Wymaga krotności jako liczby, a model
 trzyma opis słowny. System przypomina o przeliczeniu, nie liczy za człowieka.
 
-Kontrola na dziś: **542 testy backendu + 41 frontendu**, `mypy` strict i `ruff`
+Kontrola na dziś: **481 testów backendu + 56 frontendu**, `mypy` strict i `ruff`
 czysto, `npm run build` przechodzi. E8 przeszedł też próbę na żywych danych:
 propozycja, zatwierdzenie, idempotencja przy powtórzeniu, waloryzacja rok po
 roku i eksport XLSX.
@@ -59,7 +73,13 @@ Pierwszy dzień, w którym program oglądał człowiek. Wyszło z tego:
   oko musi mieć zaczepienie;
 * kokpit terminów pokazuje liczbę dni do terminu („za 12 dni", „8 dni po
   terminie"). Liczy to API (`dni_do_terminu`, `domena/kalendarz.dni_do`),
-  w strefie warszawskiej, nie w UTC.
+  w strefie warszawskiej, nie w UTC;
+* **dashboard też jest pogrupowany budynkami**, tak samo jak kartoteka:
+  nagłówek sekcji zamiast nazwy budynku powtarzanej pod każdym oznaczeniem.
+  Domyślne sortowanie listy to `sortuj=budynek`, a API dokłada oznaczenie
+  jako drugi klucz — bez tego lokale w budynku szłyby w kolejności zakładania.
+  Licznik w nagłówku dotyczy strony, nie całego budynku, i przy stronicowaniu
+  mówi to wprost („na tej stronie: 12").
 
 Trzy błędy infrastrukturalne, przez które zmian **nie było widać** mimo
 poprawnego kodu — wszystkie załatane i opisane w `pulapki.md`:
@@ -97,6 +117,64 @@ tylko aktualne, bo nie ma endpointu listującego okresy najmu) oraz ustawianie
 `budynek.nazwa_folderu` z interfejsu (kolumna jest, formularza kartoteki jeszcze
 nie; dopóki jej nie ma, dopasowanie idzie po nazwie budynku).
 
+## Wydawanie programu użytkownikowi (28.08.2026)
+
+Program ma trafić na komputer księgowej, a poprawki mają dać się wysyłać zdalnie.
+Warunki: brak wspólnego dysku, brak serwera włączonego non stop, dokumenty na jej
+lokalnym dysku, kontakt tylko mailem. Rozwiązanie i odrzucone warianty:
+[ADR 010](decyzje/010-instalacja-u-uzytkownika-i-kanal-aktualizacji.md).
+
+Kluczowa zmiana: **program i dane leżą w rozłącznych katalogach**. Dotąd `pgdata/`
+było w środku katalogu programu, więc aktualizacja „podmień katalog" kasowała bazę.
+Teraz `dane\` (baza, dokumenty, kopie, logi, `.env`) jest poza `program\`
+i aktualizator nie ma jak go dotknąć. Przełącznikiem jest jedna zmienna
+`NAJEM_KATALOG_INSTALACJI`, czytana wyłącznie w `narzedzia/sciezki.ps1`;
+nieustawiona = dzisiejsze ścieżki repozytorium, bez żadnej różnicy w pracy autora.
+
+Doszły: `spakuj-wydanie.ps1` (dwa rodzaje paczek — pełna ~400 MB i aktualizacja
+~0,4 MB), `instalator/` z zakładaniem, aktualizacją i cofaniem wersji,
+`kopia-zapasowa.ps1` z zadaniem w Harmonogramie oraz `diagnostyka.ps1`.
+Uruchomienie nie wymaga już Node.js, gdy interfejs jest zbudowany — a w paczce
+zawsze jest.
+
+**Ustawienia użytkownika przeżywają aktualizację**, bo katalog skanu
+(`ustawienie_systemu`) i sparowane foldery (`powiazanie_folderu`) siedzą w bazie,
+a nie w plikach programu.
+
+Świadome ograniczenia: aktualizator nie pobiera nic z internetu (dostaje plik),
+skrypty z `instalator\` nie aktualizują się same, a cofnięcie wersji cofa kod,
+nie bazę. Wszystkie trzy opisane w ADR 010 i `pulapki.md`.
+
+### Próba generalna przeszła i wyłapała cztery błędy
+
+Przećwiczone na instalacji testowej w `C:\SystemNajmu-proba`, pełny przebieg:
+instalacja od zera → wprowadzenie ustawienia i danych → aktualizacja 0.1.0 → 0.1.1
+→ cofnięcie → ponowna aktualizacja → diagnostyka → kopia zapasowa.
+
+**Ustawienie `katalog_skanu`, wiersz w `budynek`, stan migracji i plik `.env`
+przetrwały podmianę katalogu programu.** To była główna wątpliwość i jest
+rozstrzygnięta.
+
+Błędy, których nie dało się znaleźć inaczej niż uruchomieniem instalacji:
+
+1. **`initdb` wywracał się przy pierwszym zakładaniu bazy** — `$env:TEMP`
+   w formacie 8.3 z tyldą. Ta gałąź wykonuje się **wyłącznie przy pierwszej
+   instalacji**, więc u autora nigdy, a u użytkownika za każdym razem. Błąd był
+   w kodzie sprzed tej zmiany.
+2. **Aktualizator wisiał na kroku „robię kopię bazy"** — `| Out-Null` i uchwyt
+   odziedziczony przez `postgres.exe`.
+3. **Druga instalacja cicho podłączała się do bazy pierwszej** i puszczała na
+   niej migracje. Zdarzyło się to naprawdę, w trakcie próby. Doszło
+   `Sprawdz-Czy-Nasz`: serwer o niezgodnym katalogu danych to teraz głośny błąd
+   z nazwami obu katalogów.
+4. **`zaplanuj-kopie.ps1` był pustym plikiem** po nieudanej konwersji kodowania,
+   a instalator uruchamiał go bez słowa — zadanie kopii zapasowej nie powstawało
+   i nikt by się o tym nie dowiedział.
+
+Nie sprawdzone jeszcze na żywo: uruchomienie samego programu z instalacji
+(sprawdzony był start bazy, migracje i wszystkie skrypty obsługowe) oraz
+zachowanie przy paczce celowo uszkodzonej.
+
 ## Czego nadal nie wiem
 
 - **Punkt A** (netto czy brutto, czy VAT to zawsze 23%) przestał blokować —
@@ -123,8 +201,7 @@ nie; dopóki jej nie ma, dopasowanie idzie po nazwie budynku).
 3. Przeczytaj „Co następne" i wybierz zakres na jedną sesję
 4. Nowa gałąź, `/plan`, dopiero potem kod
 
-Dane przykładowe są w bazie. Logowanie testowe: `jan` / `Weryfikacja-E8!`
-(hasło zmienione przy próbie E8 na żywo).
+Dane przykładowe są w bazie. Logowania nie ma — program otwiera się od razu.
 
 W bazie deweloperskiej został po tej próbie lokal **`WERYF/E8`** z umową
 kontrolną, wskaźniki na lata 2026–2029 i zwaloryzowane czynsze umów `WERYF/E8`
