@@ -76,8 +76,34 @@ class TestNumerAneksu:
         """ "03" i "3" to ten sam aneks, a nie dwa rozne."""
         assert numer_z_nazwy("aneks 03.pdf") == numer_z_nazwy("aneks 3.pdf")
 
+    @pytest.mark.parametrize(
+        ("nazwa", "oczekiwany"),
+        [
+            ("Aneks nr 2_16.05.2022_ Hansa Flex.doc", "2"),
+            ("Aneks nr 1_01.07.2021.doc", "1"),
+            ("aneks nr 3-15.01.2020.pdf", "3"),
+            ("Aneks nr 2.16.05.2022.doc", "2"),
+        ],
+    )
+    def test_numer_sklejony_z_data(self, nazwa: str, oczekiwany: str) -> None:
+        """Uzytkownik pisze "Aneks nr 2_16.05.2022_ Najemca.doc" i to jest
+        w tym archiwum norma, nie wyjatek. Podkreslnik zaraz za cyfra jest
+        znakiem slowa, wiec granica slowa za numerem nigdy tam nie wypada
+        i numer przepadal na trzech aneksach z czterech."""
+        assert numer_z_nazwy(nazwa) == oczekiwany
+
+    def test_numer_nie_zjada_cyfr_z_daty(self) -> None:
+        """Numer to "2", a nie "216" ani "2_1". Data zaraz obok nie ma prawa
+        wejsc do numeru."""
+        assert numer_z_nazwy("Aneks nr 2_2022.doc") == "2"
+
     def test_liczba_w_nazwie_bez_aneksu_nie_jest_numerem(self) -> None:
         assert numer_z_nazwy("Umowa najmu 2026.pdf") is None
+
+    def test_data_przed_slowem_aneks_nie_jest_numerem(self) -> None:
+        """ "11.02.2020_ aneks Eco Club.doc" -- data stoi PRZED slowem "aneks",
+        wiec nie jest jego numerem. Ten aneks numeru w nazwie nie ma."""
+        assert numer_z_nazwy("11.02.2020_ aneks Eco Club.doc") is None
 
 
 class TestFiltrPlikow:

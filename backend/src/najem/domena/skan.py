@@ -82,7 +82,10 @@ def rozpoznaj_typ_z_nazwy(nazwa_pliku: str) -> TypDokumentu | None:
 
 
 #: "Aneks nr 3", "aneks 3", "Aneks nr. 03", "aneks_2_do_umowy".
-_NUMER_ANEKSU = re.compile(r"aneks\w*[\s_.-]*(?:nr\.?|numer)?[\s_.-]*(\d{1,3})\b")
+#: Za numerem zakaz kolejnej cyfry, nie granica slowa: „Aneks nr 2_16.05.2022"
+#: to w tym archiwum zapis typowy, a podkreslnik jest znakiem slowa, wiec \b
+#: za cyfra tam nie wypada i numer przepadal.
+_NUMER_ANEKSU = re.compile(r"aneks\w*[\s_.-]*(?:nr\.?|numer)?[\s_.-]*(\d{1,3})(?!\d)")
 
 
 def numer_z_nazwy(nazwa_pliku: str) -> str | None:

@@ -100,20 +100,34 @@ PUNKTY_ODNIESIENIA: dict[str, str] = {
     "zwrotu lokalu": "data_zakonczenia",
 }
 
-_WZORZEC_KROPKOWY = re.compile(r"\b(?P<d>\d{1,2})[.\-/](?P<m>\d{1,2})[.\-/](?P<r>\d{4})\b")
+#: Za rokiem stoi zakaz kolejnej cyfry, a nie granica słowa. Polskie umowy
+#: piszą „30.06.2019r." bez spacji, a między cyfrą a literą granicy słowa nie
+#: ma, więc taka data przepadała w całości. Samo \b myli się tu w obie strony:
+#: albo gubi „2019r.", albo wpuszcza „01.03.20275" jako rok 2027.
+_WZORZEC_KROPKOWY = re.compile(r"\b(?P<d>\d{1,2})[.\-/](?P<m>\d{1,2})[.\-/](?P<r>\d{4})(?!\d)")
 _WZORZEC_ISO = re.compile(r"\b(?P<r>\d{4})-(?P<m>\d{1,2})-(?P<d>\d{1,2})\b")
 _WZORZEC_SLOWNY = re.compile(
     r"\b(?P<d>\d{1,2})\s+(?P<m>" + "|".join(MIESIACE_DOPELNIACZ) + r")\s+(?P<r>\d{4})",
     re.IGNORECASE,
 )
 
-#: „w terminie 14 dni od dnia przekazania lokalu", „w ciągu 30 dni od zawarcia".
+#: „w terminie 14 dni od dnia przekazania lokalu", „w ciągu 30 dni od zawarcia",
+#: „w terminie 14 dni od daty przekazania Obiektu stosowne polisy".
+#:
+#: Po „od" bierzemy najwyżej trzy słowa i dopiero one są rozstrzygane słownikiem
+#: punktów odniesienia. Wcześniejszy wariant kończył dopasowanie przecinkiem albo
+#: słowem „lokalu" i przez to nie widział ani terminu polisy (R6), ani kaucji (R4):
+#: w prawdziwej umowie po punkcie odniesienia stoi dalszy ciąg zdania, nie kropka.
 _WZORZEC_TERMINU = re.compile(
     r"(?:w\s+terminie|w\s+ciągu|nie\s+później\s+niż\s+w\s+terminie)\s+"
-    r"(?P<dni>\d{1,3})\s+dni\s+(?:od|po)\s+(?:dnia\s+)?(?P<odniesienie>[\w\s]{3,30}?)"
-    r"(?=[,.;)]|\s+(?:lokalu|nieruchomości)\b|$)",
+    r"(?P<dni>\d{1,3})\s+dni\s+(?:od|po)\s+(?:dnia|daty|chwili)?\s*"
+    r"(?P<odniesienie>\w+(?:\s+\w+){0,2})",
     re.IGNORECASE,
 )
+
+#: Pojedyncze słowo wewnątrz dopasowanego punktu odniesienia. Potrzebne, żeby
+#: przyciąć koniec trafienia dokładnie tam, gdzie kończy się rozpoznana nazwa.
+_SLOWO = re.compile(r"\S+")
 
 #: „na czas określony 24 miesięcy", „na okres 36 miesięcy", „na 24 miesiące".
 _WZORZEC_OKRESU_MIESIACE = re.compile(
@@ -236,18 +250,30 @@ def znajdz_terminy_wzgledne(tekst: str) -> list[TerminWzgledny]:
     """
     terminy: list[TerminWzgledny] = []
     for dop in _WZORZEC_TERMINU.finditer(tekst):
-        surowe = " ".join(dop.group("odniesienie").casefold().split())
-        klucz = PUNKTY_ODNIESIENIA.get(surowe)
-        if klucz is None:
-            # Dopasowanie mogło zagarnąć słowo więcej („przekazania lokalu").
-            for zapis, kandydat in PUNKTY_ODNIESIENIA.items():
-                if surowe.startswith(zapis) or surowe.endswith(zapis):
-                    klucz = kandydat
-                    break
+        granice = [(m.start(), m.end()) for m in _SLOWO.finditer(dop.group("odniesienie"))]
+        slowa = [dop.group("odniesienie")[p:k].casefold() for p, k in granice]
+
+        # Najdłuższy pasujący początek wygrywa: „protokołu przekazania" bije
+        # samo „przekazania", a „zwrotu lokalu" bije „zwrotu". Reszta zdania
+        # odpada, bo nie ma prawa zmienić punktu odniesienia.
+        klucz: str | None = None
+        ile_slow = 0
+        for ile in range(len(slowa), 0, -1):
+            klucz = PUNKTY_ODNIESIENIA.get(" ".join(slowa[:ile]))
+            if klucz is not None:
+                ile_slow = ile
+                break
+
         if klucz is None:
             continue
+
+        # Koniec trafienia przycinamy do rozpoznanej nazwy, żeby podświetlenie
+        # w dokumencie objęło termin, a nie dalszy ciąg zdania.
+        koniec = dop.start("odniesienie") + granice[ile_slow - 1][1]
         terminy.append(
-            TerminWzgledny(int(dop.group("dni")), klucz, dop.start(), dop.end(), dop.group())
+            TerminWzgledny(
+                int(dop.group("dni")), klucz, dop.start(), koniec, tekst[dop.start() : koniec]
+            )
         )
     return terminy
 

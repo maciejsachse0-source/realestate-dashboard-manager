@@ -85,6 +85,27 @@ class TestZnajdywanieDat:
         trafienia = znajdz_daty("okres 2027-03-01-2028")
         assert [t.wartosc for t in trafienia] == [date(2027, 3, 1)]
 
+    @pytest.mark.parametrize(
+        ("tekst", "oczekiwana"),
+        [
+            ("w terminie do 30.06.2019r. zakonczy budowe", date(2019, 6, 30)),
+            ("w terminie do 30.06.2019 r. zakonczy budowe", date(2019, 6, 30)),
+            ("obowiazuje od 01.03.2027roku", date(2027, 3, 1)),
+            ("umowa z 15.09.2026r", date(2026, 9, 15)),
+        ],
+    )
+    def test_skrot_roku_sklejony_z_rokiem(self, tekst: str, oczekiwana: date) -> None:
+        """„2019r." bez spacji to w polskich umowach zapis normalny. Granica
+        slowa za rokiem nigdy tam nie wypada, bo cyfra i litera sa obie
+        znakami slowa, wiec taka data przepadala w calosci."""
+        (trafienie,) = znajdz_daty(tekst)
+        assert trafienie.wartosc == oczekiwana
+
+    def test_rok_nie_zjada_piatej_cyfry(self) -> None:
+        """Rozluznienie granicy nie moze przepuscic „01.03.20275" jako roku
+        2027. Za rokiem wolno stac litera, ale nie kolejna cyfra."""
+        assert znajdz_daty("numer 01.03.20275 w rejestrze") == []
+
     def test_data_nieistniejaca_jest_pomijana(self) -> None:
         assert znajdz_daty("rzekomo 31.02.2027 r.") == []
 
@@ -112,6 +133,52 @@ class TestTerminowWzglednych:
     def test_rozpoznaje_punkty_odniesienia(self, tekst: str, dni: int, odniesienie: str) -> None:
         (termin,) = znajdz_terminy_wzgledne(tekst)
         assert (termin.dni, termin.odniesienie) == (dni, odniesienie)
+
+    @pytest.mark.parametrize(
+        ("tekst", "dni", "odniesienie"),
+        [
+            (
+                "Najemca okaze w terminie 14 dni od daty przekazania Obiektu"
+                " stosowne polisy ubezpieczeniowe.",
+                14,
+                "data_przekazania",
+            ),
+            (
+                "Najemca wplaci w terminie 7 dni od daty zawarcia niniejszej umowy"
+                " kaucje zabezpieczajaca w wysokosci sumy 2 czynszow.",
+                7,
+                "data_zawarcia",
+            ),
+            (
+                "Najemca w ciągu 7 dni od dnia podpisania niniejszej umowy wystawi"
+                " weksel wlasny in blanco.",
+                7,
+                "data_zawarcia",
+            ),
+            (
+                "zwrot nastapi w terminie 30 dni od dnia zwrotu lokalu Wynajmujacemu",
+                30,
+                "data_zakonczenia",
+            ),
+        ],
+    )
+    def test_termin_w_zdaniu_bez_przecinka(self, tekst: str, dni: int, odniesienie: str) -> None:
+        """Tak te terminy stoja w prawdziwych umowach: „od daty przekazania
+        Obiektu stosowne polisy", bez przecinka i bez slowa „lokalu" tuz za
+        punktem odniesienia. Wczesniejszy wzorzec wymagal jednego albo
+        drugiego i nie znajdowal ani terminu polisy (R6), ani kaucji (R4)."""
+        (termin,) = znajdz_terminy_wzgledne(tekst)
+        assert (termin.dni, termin.odniesienie) == (dni, odniesienie)
+
+    def test_punkt_odniesienia_ktorego_nie_znamy_nie_jest_zgadywany(self) -> None:
+        """„od daty kiedy decyzja stanie sie ostateczna" to zdarzenie, ktorego
+        system nie zna. Podstawienie pod nie daty zawarcia byloby zgadywaniem
+        (decyzja D5) — takie zdanie jest w tych umowach naprawde."""
+        tekst = (
+            "nastapi najpozniej w terminie 7 dni od daty kiedy decyzja"
+            " o pozwoleniu na uzytkowanie stanie sie ostateczna"
+        )
+        assert znajdz_terminy_wzgledne(tekst) == []
 
     def test_nieznany_punkt_odniesienia_jest_pomijany(self) -> None:
         """„14 dni od czegoś" to nie termin. Podstawienie daty byłoby zgadywaniem."""
