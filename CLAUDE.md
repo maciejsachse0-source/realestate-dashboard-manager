@@ -38,15 +38,25 @@ niż `frontend/dist/index.html`. Wymuszenie: `narzedzia/uruchom.ps1 -PrzebudujIn
 - Warstwy: `api` → `uslugi` → `repozytoria` → `modele`. Nigdy w drugą stronę.
 - Frontend nie liczy niczego na pieniądzach. Wszystkie wyliczenia po stronie API.
 - Formatowanie w interfejsie tylko przez `frontend/src/funkcje/format.ts`.
-- Ścieżki do bazy, katalogu danych i `.env` bierz z `narzedzia/sciezki.ps1`
-  (PowerShell) i ze zmiennej `NAJEM_PLIK_ENV` (Python). U użytkownika program
-  i dane leżą w rozłącznych katalogach, żeby aktualizacja „podmień katalog"
-  nie kasowała bazy
+- Ścieżki do bazy, katalogu danych, `.env` i **środowiska Pythona** bierz
+  z `narzedzia/sciezki.ps1` (PowerShell) i ze zmiennej `NAJEM_PLIK_ENV` (Python).
+  U użytkownika program i dane leżą w rozłącznych katalogach, żeby aktualizacja
+  „podmień katalog" nie kasowała bazy
   ([ADR 010](docs/decyzje/010-instalacja-u-uzytkownika-i-kanal-aktualizacji.md)).
   Nieustawione `NAJEM_KATALOG_INSTALACJI` = dzisiejsze ścieżki repozytorium.
   **Jedyny wyjątek:** skrypty w `instalator/` liczą ścieżki same, bo zmieniają
   nazwę katalogu `program`, w którym `sciezki.ps1` leży. Mają własny
   `instalator/wspolne.ps1` i nie wolno im dołączać niczego z `program\`.
+- Każdy skrypt wołający `uv run` u użytkownika ustawia `UV_PROJECT_ENVIRONMENT`
+  na `Katalog-Srodowiska` (instalator liczy tę ścieżkę sam). Domyślne miejsce
+  `uv` to `program\backend\.venv`, czyli katalog kasowany przy aktualizacji —
+  bez tego program buduje środowisko od nowa przy każdym starcie po wydaniu
+  i wymaga do tego internetu. Kosztowało to już jeden przeoczony błąd.
+- Konfiguracja bez wartości (`KLUCZ=` w `.env`) ma dawać `None`, nie wartość
+  pozorną. `Path("")` to `Path(".")`, czyli istniejący katalog roboczy — pusty
+  `KATALOG_SKANU` pokazywał użytkownikowi wnętrze programu jako jego budynki.
+  Nowe pole `Path | None` czytane z `.env` potrzebuje walidatora, sam typ nie
+  wystarcza.
 - Zbudowany interfejs serwuje `InterfejsSPA` w `main.py`. Nieznany adres ekranu
   dostaje `index.html` (bez tego odświeżenie podstrony daje 404), a `index.html`
   idzie z `Cache-Control: no-cache`. Nie zamieniaj tego na zwykłe `StaticFiles` —
@@ -94,8 +104,18 @@ niż `frontend/dist/index.html`. Wymuszenie: `narzedzia/uruchom.ps1 -PrzebudujIn
 - Nowa reguła biznesowa: najpierw test, potem implementacja.
 - Przypadki brzegowe obowiązkowo: brak danych, granica miesiąca i roku,
   rok przestępny, kwoty z groszami.
+- **Nazwy plików i teksty w testach po polsku, ze znakami diakrytycznymi.**
+  Testy z nazwami typu `umowa.pdf` przepuściły błąd, przez który żaden
+  dokument z „ł" albo „ą" w nazwie nie dawał się pobrać — a w archiwum
+  użytkownika takie są prawie wszystkie. To nie jest przypadek brzegowy.
+- Wzorzec ekstrakcji sprawdzony wyłącznie na wymyślonym tekście jest sprawdzony
+  pozornie. Zanim uznasz go za gotowy, puść go na prawdziwym pliku
+  (`narzedzia/sprawdz-dokumenty.py` mówi, na czym w ogóle da się to zrobić).
 - Nie oznaczaj etapu jako gotowego, dopóki `pytest`, `mypy` i `npm test`
   nie przechodzą. Pokaż wynik, nie streszczaj go.
+- Przed wydaniem paczki: instalacja od zera w osobnym katalogu **i uruchomienie
+  z niej programu**. Sama instalacja nie wystarcza — trzy błędy blokujące
+  wysyłkę siedziały dopiero w starcie programu i w pierwszym ekranie.
 
 ## Czego nie robić
 

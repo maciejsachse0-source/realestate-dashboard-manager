@@ -28,6 +28,15 @@ $ZostawBaze = $false
 #: z tego <repo>\.env, czyli to samo co zawsze.
 $env:NAJEM_PLIK_ENV = Plik-Env
 
+#: To samo srodowisko Pythona, ktore zbudowal instalator. Bez tego uv szuka
+#: go w program\backend\.venv -- a tego katalogu u uzytkownika nie ma, bo
+#: aktualizacja podmienia caly katalog "program". Pierwszy start konczylby
+#: sie budowaniem drugiego srodowiska: kilka minut i internet, po kazdej
+#: aktualizacji od nowa. W ukladzie deweloperskim zmiennej nie ustawiamy
+#: wcale, wiec uv bierze backend\.venv i nic sie dla autora nie zmienia.
+$srodowisko = Katalog-Srodowiska
+if ($srodowisko) { $env:UV_PROJECT_ENVIRONMENT = $srodowisko }
+
 $Host.UI.RawUI.WindowTitle = 'System Zarzadzania Umowami Najmu'
 
 function Krok($numer, $tekst) { Write-Host "[$numer/5] $tekst" -ForegroundColor Cyan }

@@ -91,6 +91,29 @@ function Plik-Env {
     return (Join-Path (Katalog-Programu) '.env')
 }
 
+function Katalog-Srodowiska {
+    <#
+        Srodowisko Pythona u uzytkownika albo $null w ukladzie deweloperskim.
+
+        Domyslne miejsce uv to <projekt>\.venv, czyli program\backend\.venv --
+        czyli w srodku katalogu, ktory aktualizacja podmienia w calosci.
+        Instalator zaklada je wiec obok danych i **uruchom.ps1 musi celowac
+        w to samo miejsce**, inaczej pierwszy start po instalacji buduje drugie
+        srodowisko od zera: kilka minut i internet, ktorego program mial nie
+        potrzebowac do pracy. Potem powtarza to po kazdej aktualizacji.
+
+        $null u autora jest zamierzone: bez NAJEM_KATALOG_INSTALACJI nie
+        ustawiamy UV_PROJECT_ENVIRONMENT w ogole i uv uzywa backend\.venv,
+        czyli tego samego, co zawsze.
+
+        Instalator liczy te sciezke sam (Join-Path $Korzen 'srodowisko'),
+        bo nie wolno mu siegac do program\. Obie definicje musza zostac zgodne.
+    #>
+    $instalacja = Katalog-Instalacji
+    if ($instalacja) { return (Join-Path $instalacja 'srodowisko') }
+    return $null
+}
+
 function Czytaj-Env {
     <#
         Odczytuje .env do tablicy skrotow. Plik jest prosty: klucz=wartosc,

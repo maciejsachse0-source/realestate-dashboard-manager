@@ -154,6 +154,27 @@ class TestWgrywanieDokumentu:
         assert pobrany.content == JPEG
         assert pobrany.headers["X-Content-Type-Options"] == "nosniff"
 
+    def test_pobranie_pliku_o_polskiej_nazwie(self, klient: TestClient) -> None:
+        """Nazwa pliku idzie do naglowka HTTP, a naglowki sa latin-1.
+
+        Bez zakodowania procentowego kazdy dokument z polskim znakiem w nazwie
+        konczyl sie bledem kodowania zamiast pobraniem. W archiwum uzytkownika
+        to nie jest przypadek brzegowy, tylko wiekszosc plikow: "Zalacznik do
+        Aneksu.pdf", "Umowa Najmu.Rycerska - wzor 3.docx".
+        """
+        nazwa = "Załącznik do Aneksu.pdf"
+        dokument = klient.post(
+            "/api/v1/dokumenty?typ=aneks", files={"plik": (nazwa, PDF, "application/pdf")}
+        ).json()
+
+        pobrany = klient.get(f"/api/v1/dokumenty/{dokument['id']}/plik")
+        assert pobrany.status_code == 200
+        assert pobrany.content == PDF
+        # RFC 5987: po "UTF-8''" stoi wartosc zakodowana procentowo.
+        naglowek = pobrany.headers["Content-Disposition"]
+        assert "UTF-8''" in naglowek
+        assert "Za%C5%82%C4%85cznik" in naglowek
+
     def test_pobranie_zostawia_slad_w_audycie(self, klient: TestClient, baza: Session) -> None:
         """Każdy odczyt danych wrażliwych jest logowany (koncepcja, sekcja 8.1)."""
         from najem.domena.slowniki import OperacjaAudytu

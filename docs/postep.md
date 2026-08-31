@@ -51,7 +51,7 @@ Zastrzeżenie do R5: część liczbowa (wartość zabezpieczenia jako wielokrotn
 czynszu) **nie jest zaimplementowana**. Wymaga krotności jako liczby, a model
 trzyma opis słowny. System przypomina o przeliczeniu, nie liczy za człowieka.
 
-Kontrola na dziś: **630 testów backendu + 56 frontendu**, `mypy` strict i `ruff`
+Kontrola na dziś: **654 testy backendu + 56 frontendu**, `mypy` strict i `ruff`
 czysto, `npm run build` przechodzi. E8 przeszedł też próbę na żywych danych:
 propozycja, zatwierdzenie, idempotencja przy powtórzeniu, waloryzacja rok po
 roku i eksport XLSX.
@@ -144,13 +144,53 @@ w każdej umowie sformułowane inaczej. Tam program pokaże znaleziony fragment
 i poprosi o decyzję. Zgadywanie przy waloryzacji kosztuje realne pieniądze,
 więc to ograniczenie jest zamierzone, nie tymczasowe.
 
-### Co blokuje
+### Co blokuje — rozstrzygnięte 31.08.2026
 
-**Nie wiadomo, czy umowy użytkownika to PDF-y z tekstem, czy skany.**
-Ze skanu bez OCR nie wyjdzie ani jedna liczba, a OCR to kilkaset megabajtów
-w instalatorze i osobny podetap (E9.7). Odpowiedź daje jedno uruchomienie
-`narzedzia/sprawdz-dokumenty.py` na prawdziwym archiwum — dopóki go nie ma,
-zakres E9.7 jest nierozstrzygnięty.
+**OCR jest potrzebny. E9.7 wchodzi do zakresu.** `sprawdz-dokumenty.py` poszedł
+wreszcie na prawdziwe archiwum (`…\dla Macka\Budynki`, 13 plików, 12,5 MB):
+
+| Co | Ile | Skutek |
+|---|---|---|
+| stary `.doc` | 7 (53%) | czytnik odmawia, „zapisz jako PDF" |
+| PDF/DOCX z warstwą tekstową | 4 (30%) | czyta się od razu |
+| skan bez tekstu | 2 (15%) | bez OCR-a nie wyjdzie ani jedna liczba |
+
+Obie prawdziwe umowy w PDF to skany (14 i 8 stron, z całego pliku wychodzi 13
+i 7 znaków). Czytelne są trzy pliki DOCX i jeden mały załącznik PDF.
+
+Drugi wniosek, którego nikt nie zakładał: **stary `.doc` to ponad połowa
+archiwum**, a nie margines. Sama decyzja „nieobsługiwane, z komunikatem"
+zostawia więc poza zasięgiem 7 z 13 plików. Do rozstrzygnięcia razem z OCR-em,
+bo alternatywa (prośba do użytkowniczki o przepisanie ich na PDF) jest tania
+tylko przy kilkunastu plikach.
+
+### Trzy defekty wzorców znalezione na żywych umowach (31.08.2026)
+
+Wszystkie trzy wyglądały na drobiazg w regexie, a każdy gubił całą klasę
+danych. Znalazło je dopiero puszczenie fundamentu E9 na prawdziwych plikach —
+na wymyślonych przykładach z testów żaden nie miał prawa się pokazać.
+
+* **`\b` za rokiem.** „30.06.2019r." bez spacji to w polskich umowach zapis
+  normalny, a między cyfrą a literą granicy słowa nie ma. W jednym aneksie
+  dawało to 1 znalezioną datę zamiast 9;
+* **`\b` za numerem aneksu.** „Aneks nr 2_16.05.2022_ Najemca.doc" — podkreślnik
+  jest znakiem słowa, więc numer przepadał. Trafiało to 3 aneksy z 4;
+* **termin względny kończony przecinkiem.** Wzorzec wymagał `,` albo słowa
+  „lokalu" tuż za punktem odniesienia, a w prawdziwej umowie stoi tam dalszy
+  ciąg zdania („od daty przekazania Obiektu stosowne polisy"). Przez to
+  nie znajdował **ani terminu polisy (R6), ani kaucji (R4)** — czyli dwóch
+  reguł, na których stoi kokpit terminów. Po poprawce 5 terminów na umowę.
+
+Wniosek na przyszłość: wzorzec sprawdzony wyłącznie na wymyślonym tekście jest
+sprawdzony pozornie. Każdy nowy wzorzec E9 ma przejść przez `sprawdz-dokumenty`
+i realny plik, zanim zostanie uznany za gotowy.
+
+Zostaje niepodpięte, ale to **nie jest defekt**: `znajdz_miesiac_waloryzacji`
+zwraca `None` na całej umowie, bo w całym dokumencie pada więcej niż jedna
+nazwa miesiąca. Funkcja jest napisana do fragmentu z klauzulą waloryzacji,
+a warstwy, która taki fragment wycina (`segmentacja.py`), jeszcze nie ma.
+Zmiana tego na „bierz pierwszy z brzegu" byłaby zgadywaniem dokładnie tam,
+gdzie pomyłka kosztuje pieniądze.
 
 ## Co następne
 
@@ -256,9 +296,53 @@ Błędy, których nie dało się znaleźć inaczej niż uruchomieniem instalacji
    a instalator uruchamiał go bez słowa — zadanie kopii zapasowej nie powstawało
    i nikt by się o tym nie dowiedział.
 
-Nie sprawdzone jeszcze na żywo: uruchomienie samego programu z instalacji
-(sprawdzony był start bazy, migracje i wszystkie skrypty obsługowe) oraz
-zachowanie przy paczce celowo uszkodzonej.
+### Druga próba generalna, tym razem z uruchomieniem programu (31.08.2026)
+
+Poprzednia próba nie obejmowała startu samego programu z instalacji i to
+właśnie tam siedziały błędy. Pełny przebieg: paczka 308,6 MB → rozpakowanie
+do `C:\SystemNajmu-proba` → `Zainstaluj.cmd` → **uruchomienie programu** →
+przejście całej ścieżki na prawdziwym archiwum → diagnostyka → kopia zapasowa.
+
+Znalezione i naprawione (żadnego z nich nie dało się złapać inaczej niż
+uruchomieniem):
+
+1. **`uruchom.ps1` nie ustawiał `UV_PROJECT_ENVIRONMENT`.** Instalator zakładał
+   środowisko Pythona w `<instalacja>\srodowisko`, ale skrypt startowy o nim
+   nie wiedział i pierwszy start budował **drugie** środowisko w
+   `program\backend\.venv` — czyli w katalogu, który aktualizacja kasuje.
+   Kilka minut i internet, po każdej aktualizacji od nowa, na komputerze,
+   który miał działać bez sieci. Doszło `Katalog-Srodowiska` w `sciezki.ps1`.
+2. **Świeża instalacja pokazywała `alembic` i `src` jako budynki użytkownika.**
+   `KATALOG_SKANU=` bez wartości dawało `Path(".")`, czyli katalog roboczy
+   serwera, a ten przechodzi przez `is_dir()`. Pierwszy ekran programu
+   pokazywał więc jego własne wnętrze zamiast prośby o wskazanie katalogu.
+3. **Dokumenty z polskimi znakami w nazwie nie dawały się pobrać.** Nazwa szła
+   do `Content-Disposition` bez kodowania procentowego, a nagłówki HTTP są
+   latin-1 — „Załącznik do Aneksu.pdf" kończył się błędem kodeka zamiast
+   plikiem. W archiwum użytkownika to większość dokumentów.
+4. **Komunikat przy nieustawionym katalogu odsyłał do pliku `.env`**, choć
+   katalog ustawia się w programie i to baza wygrywa z plikiem. Kierował
+   użytkownika dokładnie tam, gdzie nie ma czego szukać.
+5. Instalator wywracał się bez konsoli na `Read-Host` zwracającym `$null`
+   (drobiazg dla użytkownika klikającego w ikonkę, blokada dla każdego
+   uruchomienia automatycznego).
+
+Sprawdzone i działa: instalacja od zera z 7 migracjami, start programu ze
+środowiska instalatora (bez budowania drugiego), skan prawdziwego archiwum,
+parowanie folderu z umową, import dokumentów jako odnośników, deduplikacja,
+pominięcia, przegląd odnośników, pobranie pliku po odnośniku, generator zdarzeń
+razem z idempotencją, decyzja D4 (niezatwierdzony czynsz nie wchodzi na
+dashboard, zatwierdzony wchodzi), waloryzacja 9 485,08 → 9 836,03 przy 3,7%,
+eksport XLSX, diagnostyka, kopia zapasowa razem z katalogiem dokumentów.
+
+Nie sprawdzone nadal: zachowanie przy paczce celowo uszkodzonej oraz wygląd
+ekranów w przeglądarce (rozszerzenie sterujące Chrome nie dostaje dostępu do
+`127.0.0.1:8010`; trasy i nagłówki sprawdzone przez `curl`, interfejs ma
+56 testów i buduje się czysto).
+
+Do rozważenia, nie naprawione: diagnostyka wypisuje `KATALOG_SKANU = puste`,
+czytając tylko `.env`, choć katalog bywa ustawiony w bazie i to ona wygrywa.
+Wysłany plik diagnostyczny może przez to skierować na fałszywy trop.
 
 ## Czego nadal nie wiem
 
@@ -286,9 +370,29 @@ zachowanie przy paczce celowo uszkodzonej.
 3. Przeczytaj „Co następne" i wybierz zakres na jedną sesję
 4. Nowa gałąź, `/plan`, dopiero potem kod
 
-Dane przykładowe są w bazie. Logowania nie ma — program otwiera się od razu.
+Logowania nie ma — program otwiera się od razu.
 
-W bazie deweloperskiej został po tej próbie lokal **`WERYF/E8`** z umową
-kontrolną, wskaźniki na lata 2026–2029 i zwaloryzowane czynsze umów `WERYF/E8`
-oraz `18A/12`. To dane testowe, nie import użytkownika — można je zignorować
-albo wyczyścić razem z resztą demo.
+**Baza deweloperska jest pusta z danych demo (31.08.2026.)** Zniknęło wszystko,
+czego nikt nie wprowadził świadomie: budynki `18A`, `22B`, `40A`, `Test folderu`,
+8 lokali razem z kontrolnym `WERYF/E8`, 7 najemców, 7 okresów najmu, wskaźniki
+GUS na lata 2026–2029 i zależne od nich parametry, składniki, zabezpieczenia
+i zdarzenia. Powód: przy pierwszym oglądaniu programu na prawdziwym archiwum
+zmyślone rekordy nie dają się odróżnić od danych z dokumentów.
+
+Zostały **dwa budynki wzięte z nazw katalogów na dysku** — `Nowatorów`
+i `Rycerska`, obie z ustawionym `nazwa_folderu`. Bez nich skan folderów nie ma
+z czym parować i pokazuje `budynek_id: null` przy każdym folderze.
+
+`log_audytu` **nie został wyczyszczony** i to jest zamierzone: baza broni go
+wyzwalaczem `log_audytu_tylko_do_zapisu`, który przerywa `TRUNCATE` błędem.
+Skutek jest taki, że zostało 37 wpisów wskazujących na wiersze, których już
+nie ma — i dokładnie tak ma wyglądać log, którego nikt nie poprawia po fakcie.
+
+Czyszczenie zrobił jednorazowy skrypt (`truncate` na tabelach danych, bez
+`log_audytu` i bez `ustawienie_systemu`). **Nie ma go w repozytorium celowo** —
+skrypt kasujący całą bazę nie ma prawa trafić do paczki wydania, a stamtąd na
+komputer użytkowniczki.
+
+Katalog skanu siedzi w bazie (`ustawienie_systemu`) i **przeżył czyszczenie**.
+Wartość z `.env` wskazuje na nieistniejący katalog po poprzednim właścicielu
+maszyny i jest już tylko wartością zapasową — baza wygrywa z plikiem.

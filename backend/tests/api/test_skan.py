@@ -87,7 +87,12 @@ class TestSkanowanie:
         assert odpowiedz.status_code == 200
         tresc = odpowiedz.json()
         assert tresc["dostepny"] is False
-        assert "KATALOG_SKANU" in tresc["komunikat"]
+        # Komunikat ma kierowac na ekran, nie do pliku konfiguracyjnego:
+        # katalog ustawia sie w programie i to ustawienie wygrywa z .env.
+        # Komunikat ma kierowac na pole na ekranie, nie do pliku konfiguracyjnego:
+        # katalog ustawia sie w programie i to ustawienie wygrywa z .env.
+        assert "w polu na górze ekranu" in tresc["komunikat"]
+        assert ".env" not in tresc["komunikat"]
 
     def test_wskazany_katalog_nie_istnieje(
         self, operator: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

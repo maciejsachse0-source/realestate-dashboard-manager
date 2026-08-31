@@ -394,8 +394,65 @@ wyjścia tych wywołań. Ta sama uwaga stoi już w `uruchom.ps1` przy kroku 2.
 Domyślnie `uv` trzyma je w `backend\.venv`, czyli w katalogu, który aktualizacja
 podmienia. Efekt: każde wydanie odbudowuje środowisko od zera — minuta czekania
 i **wymóg internetu albo pełnego cache `uv`** na komputerze, który miał działać
-bez sieci. Dlatego `zainstaluj.ps1` i `aktualizuj.ps1` ustawiają
-`UV_PROJECT_ENVIRONMENT` na `<instalacja>\srodowisko`.
+bez sieci. Dlatego `zainstaluj.ps1`, `aktualizuj.ps1` **i `uruchom.ps1`**
+ustawiają `UV_PROJECT_ENVIRONMENT` na `<instalacja>\srodowisko`.
+
+`uruchom.ps1` dopisano do tej listy 31.08.2026 i to nie było uzupełnienie
+kosmetyczne. Instalator zakładał środowisko we właściwym miejscu, ale skrypt
+startowy o nim nie wiedział, więc **pierwsze uruchomienie programu budowało
+drugie środowisko** w `program\backend\.venv` — i robiło to od nowa po każdej
+aktualizacji, bo aktualizacja ten katalog kasuje. Dokładnie ten scenariusz,
+przed którym broni cała reszta wpisu. Nie wyszło wcześniej, bo próba generalna
+sprawdzała instalację i skrypty obsługowe, a nie start samego programu.
+
+Ścieżkę podaje `Katalog-Srodowiska` z `narzedzia\sciezki.ps1`; w układzie
+deweloperskim zwraca `$null` i wtedy zmiennej **nie ustawiamy wcale**, żeby
+`uv` wziął `backend\.venv` jak zawsze. Skrypty z `instalator\` liczą tę samą
+ścieżkę u siebie, bo nie wolno im sięgać do `program\` — obie definicje muszą
+zostać zgodne.
+
+### `[string]$null` w PowerShellu 5.1 to nadal `$null`
+`Read-Host` bez konsoli (uruchomienie z potoku, z zadania, ze zdalnej sesji)
+zwraca `$null`, a `.Trim()` na nim przerywa skrypt komunikatem
+`You cannot call a method on a null-valued expression`. Instalator wywracał się
+przez to w połowie zakładania katalogów, nie mówiąc, na czym.
+
+Rzutowanie `([string](Read-Host ...))` **nie pomaga** — sprawdzone, daje z
+powrotem `$null`. Działa podstawienie w cudzysłowach: `"$(Read-Host ...)"`.
+To samo dotyczy każdego innego miejsca, gdzie wynik `Read-Host` idzie prosto
+do metody. Porównania (`-ne 'TAK'`) są bezpieczne, bo `$null` po prostu nie
+równa się wzorcowi.
+
+### Pusta wartość w `.env` to `Path(".")`, czyli katalog roboczy
+Instalator zapisuje `KATALOG_SKANU=` bez wartości, bo katalog wskazuje się
+dopiero w programie. Pydantic robił z pustego napisu `Path("")`, a to jest
+`Path(".")` — istniejący katalog. Skan przechodził przez `is_dir()`, meldował
+„dostępny" i pokazywał użytkownikowi `alembic` oraz `src` jako jego budynki.
+Pierwszy ekran świeżej instalacji pokazywał więc wnętrze samego programu
+zamiast komunikatu „wskaż katalog".
+
+Broni tego walidator `_brak_katalogu_to_none` w `config.py`: pusty napis,
+same spacje, `""` i `.` dają `None`. Przy każdym nowym polu typu `Path | None`
+czytanym z `.env` trzeba o tym pamiętać — sam typ nie wystarcza.
+
+Osobno: **ścieżek w `.env` nie bierzemy w cudzysłowy.** Czytnik przetwarza
+wtedy sekwencje z ukośnikiem wstecznym i `C:\Temp\tmp` traci `\t` na rzecz
+tabulatora. Cudzysłowy zdejmujemy, ale zamienionego znaku nie da się odzyskać.
+Ścieżkę wskazuje się na ekranie „Dokumenty z dysku", gdzie `sprawdz_katalog`
+zdejmuje cudzysłowy z tego, co wkleił człowiek, i sprawdza katalog przy zapisie.
+
+### Nazwa pliku w nagłówku HTTP musi być zakodowana procentowo
+`Content-Disposition: inline; filename*=UTF-8''...` wygląda na załatwiony
+przypadek polskich nazw, ale wartość po `UTF-8''` **musi być zakodowana
+procentowo** (RFC 5987). Nagłówki HTTP są latin-1, więc wstawiona wprost „ł"
+nie przechodzi przez kodowanie odpowiedzi: pobranie kończy się błędem kodeka
+zamiast plikiem, a użytkownik widzi komunikat o `'latin-1' codec`.
+
+Dotyczyło to **większości dokumentów w archiwum** („Załącznik do Aneksu.pdf",
+„Umowa Najmu.Rycerska - wzór 3.docx"). Nie wyszło w testach, bo wszystkie
+nazwy plików w nich były po angielsku i bez znaków diakrytycznych. Każdy nowy
+test na wgrywanie i pobieranie plików ma używać nazwy z polskimi znakami —
+u tego użytkownika to jest przypadek typowy, nie brzegowy.
 
 ### Normalizacja kodowania: otwarcie pliku do zapisu czyści go przed zapisem
 Skrypt porządkujący pliki na ASCII skasował treść `zaplanuj-kopie.ps1`:

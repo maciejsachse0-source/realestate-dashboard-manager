@@ -78,7 +78,14 @@ try {
         Pisz '      linkowane, wiec awaria dysku zabiera baze i pliki naraz.' 'DarkGray'
         Pisz '      Mozna zostawic puste i ustawic to pozniej w pliku dane\.env.' 'DarkGray'
         Pisz ''
-        $katalogKopii = (Read-Host '      Katalog kopii').Trim().Trim('"')
+        # Cudzyslowy wokol podstawienia sa konieczne. Bez konsoli (uruchomienie
+        # z potoku, z zadania, ze zdalnej sesji) Read-Host zwraca $null,
+        # a .Trim() na nim konczy instalacje komunikatem "You cannot call
+        # a method on a null-valued expression" -- w polowie zakladania
+        # katalogow i bez slowa o tym, co wlasciwie poszlo nie tak.
+        # Rzutowanie ([string]$null) tu NIE pomaga: w PowerShellu 5.1 daje
+        # z powrotem $null, nie pusty napis. Sprawdzone, nie zgadywane.
+        $katalogKopii = "$(Read-Host '      Katalog kopii')".Trim().Trim('"')
 
         $tresc = @"
 # Konfiguracja instalacji. Aktualizacja programu tego pliku nie dotyka.

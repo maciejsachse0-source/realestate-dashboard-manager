@@ -170,10 +170,12 @@ def skanuj(baza: Session, *, katalog: Path | None) -> WynikSkanu:
         return WynikSkanu(
             katalog=None,
             dostepny=False,
-            komunikat=(
-                "Nie wskazano katalogu z dokumentami. Ustaw KATALOG_SKANU w pliku .env "
-                "i uruchom program ponownie."
-            ),
+            # Kieruje na ekran, a nie na plik .env. Katalog ustawia sie
+            # w programie od czasu, gdy ustawienie trafilo do bazy, i to baza
+            # wygrywa z plikiem. Instalator konczy dokladnie tym zdaniem,
+            # wiec komunikat odsylajacy do .env kazalby uzytkownikowi
+            # szukac czegos, czego nie ma sensu ruszac.
+            komunikat=("Nie wskazano katalogu z dokumentami. Wskaż go w polu na górze ekranu."),
         )
 
     korzen = Path(katalog)

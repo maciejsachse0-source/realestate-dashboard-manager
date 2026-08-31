@@ -291,7 +291,7 @@ describe("Ekran dokumentów z dysku", () => {
           katalog: null,
           dostepny: false,
           komunikat:
-            "Nie wskazano katalogu z dokumentami. Ustaw KATALOG_SKANU w pliku .env.",
+            "Nie wskazano katalogu z dokumentami. Wskaż go w polu na górze ekranu.",
           nowych: 0,
           obcietych: 0,
           budynki: [],
@@ -302,7 +302,9 @@ describe("Ekran dokumentów z dysku", () => {
 
     pokaz();
 
-    expect(await screen.findByText(/KATALOG_SKANU/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Wskaż go w polu na górze ekranu/),
+    ).toBeInTheDocument();
   });
 
   it("tłumaczy w osobnej zakładce, że treści dokumentów nie czyta", async () => {

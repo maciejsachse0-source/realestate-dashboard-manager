@@ -7,6 +7,7 @@ i ślad w `parametr_wartosc`.
 
 from datetime import UTC, date, datetime
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
@@ -220,7 +221,11 @@ def pobierz(dokument_id: int, baza: SesjaBazy, request: Request) -> Response:
         media_type=dokument.typ_mime or "application/octet-stream",
         headers={
             # filename* z kodowaniem UTF-8: nazwy plików bywają po polsku.
-            "Content-Disposition": f"inline; filename*=UTF-8''{nazwa}",
+            # Wartość musi być zakodowana procentowo (RFC 5987). Nagłówki HTTP
+            # są latin-1, więc wstawiona wprost „ł" nie przechodzi przez
+            # kodowanie odpowiedzi i pobranie kończy się błędem kodeka zamiast
+            # plikiem. Dotyczyło to większości dokumentów w archiwum.
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(nazwa)}",
             "X-Content-Type-Options": "nosniff",
         },
     )
