@@ -3,11 +3,11 @@
 from fastapi import APIRouter
 
 from najem.api.v1 import (
-    auth,
     dashboard,
     dokumenty,
     import_danych,
     kartoteka,
+    skan,
     umowy,
     waloryzacja,
     zdarzenia,
@@ -16,11 +16,11 @@ from najem.api.v1 import (
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(zdrowie.router)
-router.include_router(auth.router)
 router.include_router(kartoteka.router)
 router.include_router(dashboard.router)
 router.include_router(umowy.router)
 router.include_router(dokumenty.router)
 router.include_router(import_danych.router)
+router.include_router(skan.router)
 router.include_router(waloryzacja.router)
 router.include_router(zdarzenia.router)

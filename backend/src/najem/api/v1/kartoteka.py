@@ -11,11 +11,9 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import ColumnElement, func, or_, select
 
-from najem.auth.sesje import ZalogowanySesja
-from najem.auth.zaleznosci import Administrator, Operator, Podglad, Zarzadca
 from najem.baza import SesjaBazy
 from najem.domena.slowniki import OperacjaAudytu
-from najem.modele import Budynek, Lokal, Najemca, Uzytkownik
+from najem.modele import Budynek, Lokal, Najemca
 from najem.schematy.kartoteka import (
     BudynekWejscie,
     BudynekWyjscie,
@@ -26,7 +24,6 @@ from najem.schematy.kartoteka import (
     NajemcaWejscie,
     NajemcaWyjscie,
     NajemcaZmiana,
-    UzytkownikNaLiscie,
 )
 from najem.schematy.wspolne import LIMIT_DOMYSLNY, LIMIT_MAKSYMALNY, Strona
 from najem.uslugi.audyt import zapisz_zmiane
@@ -51,7 +48,6 @@ def _teraz() -> datetime:
 @router.get("/budynki", response_model=Strona[BudynekWyjscie], summary="Lista budynków")
 def lista_budynkow(
     baza: SesjaBazy,
-    _: Podglad,
     limit: Limit = LIMIT_DOMYSLNY,
     offset: Offset = 0,
     tylko_aktywne: bool = True,
@@ -79,9 +75,7 @@ def lista_budynkow(
     status_code=status.HTTP_201_CREATED,
     summary="Dodaje budynek",
 )
-def dodaj_budynek(
-    dane: BudynekWejscie, baza: SesjaBazy, kto: Administrator, request: Request
-) -> BudynekWyjscie:
+def dodaj_budynek(dane: BudynekWejscie, baza: SesjaBazy, request: Request) -> BudynekWyjscie:
     budynek = Budynek(**dane.model_dump())
     baza.add(budynek)
     baza.flush()
@@ -89,7 +83,6 @@ def dodaj_budynek(
         baza,
         budynek,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -101,7 +94,6 @@ def zmien_budynek(
     budynek_id: int,
     dane: BudynekZmiana,
     baza: SesjaBazy,
-    kto: Administrator,
     request: Request,
 ) -> BudynekWyjscie:
     budynek = _pobierz(baza, Budynek, budynek_id, "Budynek")
@@ -112,7 +104,6 @@ def zmien_budynek(
         baza,
         budynek,
         operacja=OperacjaAudytu.ZMIANA,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -124,9 +115,9 @@ def zmien_budynek(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Usuwa budynek (miękko)",
 )
-def usun_budynek(budynek_id: int, baza: SesjaBazy, kto: Administrator, request: Request) -> None:
+def usun_budynek(budynek_id: int, baza: SesjaBazy, request: Request) -> None:
     budynek = _pobierz(baza, Budynek, budynek_id, "Budynek")
-    _usun_miekko(baza, budynek, kto, _adres(request))
+    _usun_miekko(baza, budynek, _adres(request))
     baza.commit()
 
 
@@ -139,9 +130,7 @@ def usun_budynek(budynek_id: int, baza: SesjaBazy, kto: Administrator, request: 
     status_code=status.HTTP_201_CREATED,
     summary="Dodaje lokal",
 )
-def dodaj_lokal(
-    dane: LokalWejscie, baza: SesjaBazy, kto: Zarzadca, request: Request
-) -> LokalWyjscie:
+def dodaj_lokal(dane: LokalWejscie, baza: SesjaBazy, request: Request) -> LokalWyjscie:
     if baza.get(Budynek, dane.budynek_id) is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Wskazany budynek nie istnieje.")
 
@@ -152,7 +141,6 @@ def dodaj_lokal(
         baza,
         lokal,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -160,13 +148,13 @@ def dodaj_lokal(
 
 
 @router.get("/lokale/{lokal_id}", response_model=LokalWyjscie, summary="Szczegóły lokalu")
-def pobierz_lokal(lokal_id: int, baza: SesjaBazy, _: Podglad) -> LokalWyjscie:
+def pobierz_lokal(lokal_id: int, baza: SesjaBazy) -> LokalWyjscie:
     return LokalWyjscie.model_validate(_pobierz(baza, Lokal, lokal_id, "Lokal"))
 
 
 @router.put("/lokale/{lokal_id}", response_model=LokalWyjscie, summary="Zmienia lokal")
 def zmien_lokal(
-    lokal_id: int, dane: LokalZmiana, baza: SesjaBazy, kto: Zarzadca, request: Request
+    lokal_id: int, dane: LokalZmiana, baza: SesjaBazy, request: Request
 ) -> LokalWyjscie:
     lokal = _pobierz(baza, Lokal, lokal_id, "Lokal")
     _sprawdz_wersje(lokal, dane.wersja, "Lokal")
@@ -176,7 +164,6 @@ def zmien_lokal(
         baza,
         lokal,
         operacja=OperacjaAudytu.ZMIANA,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -188,9 +175,9 @@ def zmien_lokal(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Usuwa lokal (miękko)",
 )
-def usun_lokal(lokal_id: int, baza: SesjaBazy, kto: Zarzadca, request: Request) -> None:
+def usun_lokal(lokal_id: int, baza: SesjaBazy, request: Request) -> None:
     lokal = _pobierz(baza, Lokal, lokal_id, "Lokal")
-    _usun_miekko(baza, lokal, kto, _adres(request))
+    _usun_miekko(baza, lokal, _adres(request))
     baza.commit()
 
 
@@ -200,7 +187,6 @@ def usun_lokal(lokal_id: int, baza: SesjaBazy, kto: Zarzadca, request: Request) 
 @router.get("/najemcy", response_model=Strona[NajemcaWyjscie], summary="Lista najemców")
 def lista_najemcow(
     baza: SesjaBazy,
-    _: Podglad,
     limit: Limit = LIMIT_DOMYSLNY,
     offset: Offset = 0,
     szukaj: Annotated[str | None, Query(max_length=200)] = None,
@@ -224,7 +210,7 @@ def lista_najemcow(
 
 
 @router.get("/najemcy/{najemca_id}", response_model=NajemcaWyjscie, summary="Szczegóły najemcy")
-def pobierz_najemce(najemca_id: int, baza: SesjaBazy, _: Podglad) -> NajemcaWyjscie:
+def pobierz_najemce(najemca_id: int, baza: SesjaBazy) -> NajemcaWyjscie:
     return NajemcaWyjscie.model_validate(_pobierz(baza, Najemca, najemca_id, "Najemca"))
 
 
@@ -234,9 +220,7 @@ def pobierz_najemce(najemca_id: int, baza: SesjaBazy, _: Podglad) -> NajemcaWyjs
     status_code=status.HTTP_201_CREATED,
     summary="Dodaje najemcę",
 )
-def dodaj_najemce(
-    dane: NajemcaWejscie, baza: SesjaBazy, kto: Zarzadca, request: Request
-) -> NajemcaWyjscie:
+def dodaj_najemce(dane: NajemcaWejscie, baza: SesjaBazy, request: Request) -> NajemcaWyjscie:
     najemca = Najemca(**dane.model_dump())
     baza.add(najemca)
     baza.flush()
@@ -244,7 +228,6 @@ def dodaj_najemce(
         baza,
         najemca,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -256,7 +239,6 @@ def zmien_najemce(
     najemca_id: int,
     dane: NajemcaZmiana,
     baza: SesjaBazy,
-    kto: Zarzadca,
     request: Request,
 ) -> NajemcaWyjscie:
     najemca = _pobierz(baza, Najemca, najemca_id, "Najemca")
@@ -267,7 +249,6 @@ def zmien_najemce(
         baza,
         najemca,
         operacja=OperacjaAudytu.ZMIANA,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -279,9 +260,9 @@ def zmien_najemce(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Usuwa najemcę (miękko)",
 )
-def usun_najemce(najemca_id: int, baza: SesjaBazy, kto: Zarzadca, request: Request) -> None:
+def usun_najemce(najemca_id: int, baza: SesjaBazy, request: Request) -> None:
     najemca = _pobierz(baza, Najemca, najemca_id, "Najemca")
-    _usun_miekko(baza, najemca, kto, _adres(request))
+    _usun_miekko(baza, najemca, _adres(request))
     baza.commit()
 
 
@@ -318,35 +299,12 @@ def _pobierz[T](baza: SesjaBazy, model: type[T], identyfikator: int, nazwa: str)
     return obiekt
 
 
-def _usun_miekko(baza: SesjaBazy, obiekt: object, kto: ZalogowanySesja, adres: str | None) -> None:
+def _usun_miekko(baza: SesjaBazy, obiekt: object, adres: str | None) -> None:
     """Nic nie kasujemy fizycznie (CLAUDE.md, zasady twarde)."""
     obiekt.usunieto_dnia = _teraz()  # type: ignore[attr-defined]
-    obiekt.usunal_uzytkownik_id = kto.uzytkownik.id  # type: ignore[attr-defined]
     zapisz_zmiane(
         baza,
         obiekt,
         operacja=OperacjaAudytu.USUNIECIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=adres,
     )
-
-
-# --------------------------------------------------------------- uzytkownicy
-
-
-@router.get(
-    "/uzytkownicy",
-    response_model=list[UzytkownikNaLiscie],
-    summary="Lista użytkowników do przypisywania zadań",
-)
-def lista_uzytkownikow(baza: SesjaBazy, _: Operator) -> list[UzytkownikNaLiscie]:
-    """Kto może dostać zdarzenie do obsługi.
-
-    Zwraca tylko imię, nazwisko i rolę. Bez adresu e-mail, bez daty ostatniego
-    logowania i bez niczego, co dotyczy bezpieczeństwa konta — to należy
-    do panelu administratora, a nie do listy wyboru w kokpicie terminów.
-    """
-    wiersze = baza.scalars(
-        select(Uzytkownik).where(Uzytkownik.aktywny.is_(True)).order_by(Uzytkownik.imie_nazwisko)
-    ).all()
-    return [UzytkownikNaLiscie.model_validate(u) for u in wiersze]

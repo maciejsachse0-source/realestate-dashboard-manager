@@ -70,14 +70,8 @@ class Zdarzenie(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
     )
     tresc: Mapped[str] = mapped_column(String(500), nullable=False)
 
-    przypisany_uzytkownik_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("uzytkownik.id", ondelete="SET NULL"), nullable=True
-    )
     odroczone_do: Mapped[date | None] = mapped_column(Date, nullable=True)
     obsluzone_dnia: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    obsluzyl_uzytkownik_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("uzytkownik.id", ondelete="SET NULL"), nullable=True
-    )
     notatka: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
@@ -103,7 +97,6 @@ class Zdarzenie(Baza, ZnacznikiCzasu, MiekkieUsuwanie, Wersjonowanie):
             postgresql_where=text("status = 'otwarte' AND usunieto_dnia IS NULL"),
         ),
         Index("ix_zdarzenie_lokal_status", "lokal_id", "status"),
-        Index("ix_zdarzenie_przypisany", "przypisany_uzytkownik_id", "status"),
     )
 
     def __repr__(self) -> str:
@@ -125,9 +118,6 @@ class WskaznikWaloryzacji(Baza, ZnacznikiCzasu, Wersjonowanie):
     #: Wartosc w procentach, np. 3.70 dla wskaznika 3,7 procent.
     wartosc_procent: Mapped[TypStawkiVat] = mapped_column(nullable=False)
     data_publikacji: Mapped[date | None] = mapped_column(Date, nullable=True)
-    wprowadzil_uzytkownik_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("uzytkownik.id", ondelete="RESTRICT"), nullable=True
-    )
     uwagi: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
@@ -153,9 +143,6 @@ class LogAudytu(Baza):
     kiedy: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    uzytkownik_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("uzytkownik.id", ondelete="RESTRICT"), nullable=True
-    )
     operacja: Mapped[OperacjaAudytu] = mapped_column(slownik(OperacjaAudytu), nullable=False)
 
     tabela: Mapped[str] = mapped_column(String(60), nullable=False)
@@ -172,7 +159,6 @@ class LogAudytu(Baza):
 
     __table_args__ = (
         Index("ix_audyt_rekord", "tabela", "rekord_id", "kiedy"),
-        Index("ix_audyt_uzytkownik", "uzytkownik_id", "kiedy"),
         Index("ix_audyt_kiedy", "kiedy"),
     )
 

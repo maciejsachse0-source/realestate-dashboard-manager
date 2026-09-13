@@ -67,6 +67,21 @@ class TestZabezpieczenie:
             StatusZabezpieczenia.ZWROCONE,
         )
 
+    def test_zwrot_i_zatrzymanie_da_sie_cofnac(self) -> None:
+        """Jeden klik od pomylki, wiec musi byc droga powrotna do 'dostarczone'."""
+        for koncowy in (StatusZabezpieczenia.ZWROCONE, StatusZabezpieczenia.ZATRZYMANE):
+            assert czy_przejscie_dozwolone(
+                PRZEJSCIA_ZABEZPIECZENIA, koncowy, StatusZabezpieczenia.DOSTARCZONE
+            )
+
+    def test_cofniecie_nie_wraca_do_wymagane(self) -> None:
+        """Powrot idzie tam, skad przejscie wyszlo, a nie na sam poczatek."""
+        assert not czy_przejscie_dozwolone(
+            PRZEJSCIA_ZABEZPIECZENIA,
+            StatusZabezpieczenia.ZWROCONE,
+            StatusZabezpieczenia.WYMAGANE,
+        )
+
     def test_nie_da_sie_zwrocic_czegos_czego_nie_dostarczono(self) -> None:
         assert not czy_przejscie_dozwolone(
             PRZEJSCIA_ZABEZPIECZENIA,

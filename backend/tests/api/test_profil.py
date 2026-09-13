@@ -8,53 +8,20 @@ from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from najem.domena.slowniki import RolaUzytkownika
 from najem.modele import Lokal, Najemca
-from tests.api.conftest import zaloguj_jako
 
 pytestmark = pytest.mark.integracja
 
 DZIS = date(2026, 8, 25)
 
 
-class TestListaUzytkownikow:
-    def test_operator_widzi_liste(self, klient: TestClient, baza: Session) -> None:
-        uzytkownik = zaloguj_jako(klient, baza, RolaUzytkownika.OPERATOR)
-        odpowiedz = klient.get("/api/v1/uzytkownicy")
-        assert odpowiedz.status_code == 200
-        assert any(u["id"] == uzytkownik.id for u in odpowiedz.json())
-
-    def test_podglad_nie_widzi_listy(self, klient_podglad: TestClient) -> None:
-        """Przypisywanie zadań to praca operatora, nie osoby z podglądem."""
-        assert klient_podglad.get("/api/v1/uzytkownicy").status_code == 403
-
-    def test_lista_nie_zdradza_danych_konta(self, klient: TestClient, baza: Session) -> None:
-        """Lista wyboru w kokpicie nie jest miejscem na e-mail ani datę logowania."""
-        zaloguj_jako(klient, baza, RolaUzytkownika.OPERATOR)
-        pozycja = klient.get("/api/v1/uzytkownicy").json()[0]
-        assert set(pozycja) == {"id", "imie_nazwisko", "rola"}
-
-    def test_konto_nieaktywne_nie_pojawia_sie(self, klient: TestClient, baza: Session) -> None:
-        uzytkownik = zaloguj_jako(klient, baza, RolaUzytkownika.OPERATOR)
-        widoczne = klient.get("/api/v1/uzytkownicy").json()
-        assert any(u["id"] == uzytkownik.id for u in widoczne)
-
-        uzytkownik.aktywny = False
-        baza.flush()
-        # Konto nieaktywne traci też sesję, więc sprawdzamy z innego konta.
-        klient.cookies.clear()
-        zaloguj_jako(klient, baza, RolaUzytkownika.ZARZADCA)
-        assert all(u["id"] != uzytkownik.id for u in klient.get("/api/v1/uzytkownicy").json())
-
-
 class TestZmianaZabezpieczenia:
     @pytest.fixture
     def zabezpieczenie(
-        self, klient_zarzadca: TestClient, lokal_api: Lokal, najemca_api: Najemca
+        self, klient: TestClient, lokal_api: Lokal, najemca_api: Najemca
     ) -> dict[str, object]:
-        okres: dict[str, object] = klient_zarzadca.post(
+        okres: dict[str, object] = klient.post(
             "/api/v1/okresy-najmu",
             json={
                 "lokal_id": lokal_api.id,
@@ -64,16 +31,16 @@ class TestZmianaZabezpieczenia:
                 "okres_zawarcia_miesiace": 24,
             },
         ).json()
-        odpowiedz: dict[str, object] = klient_zarzadca.post(
+        odpowiedz: dict[str, object] = klient.post(
             f"/api/v1/okresy-najmu/{okres['id']}/zabezpieczenia",
             json={"rodzaj": "kaucja", "status": "wymagane", "data_wymagalnosci": "2026-02-15"},
         ).json()
         return odpowiedz
 
     def test_odnotowanie_wplaty(
-        self, klient_zarzadca: TestClient, zabezpieczenie: dict[str, object]
+        self, klient: TestClient, zabezpieczenie: dict[str, object]
     ) -> None:
-        odpowiedz = klient_zarzadca.put(
+        odpowiedz = klient.put(
             f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}",
             json={
                 "rodzaj": "kaucja",
@@ -87,10 +54,10 @@ class TestZmianaZabezpieczenia:
         assert odpowiedz.json()["status"] == "dostarczone"
 
     def test_niedozwolone_przejscie_jest_odrzucane(
-        self, klient_zarzadca: TestClient, zabezpieczenie: dict[str, object]
+        self, klient: TestClient, zabezpieczenie: dict[str, object]
     ) -> None:
         """Reguła R4: nie da się zwrócić czegoś, czego nie dostarczono."""
-        odpowiedz = klient_zarzadca.put(
+        odpowiedz = klient.put(
             f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}",
             json={
                 "rodzaj": "kaucja",
@@ -102,7 +69,7 @@ class TestZmianaZabezpieczenia:
         assert "wymagane" in odpowiedz.json()["detail"]
 
     def test_stara_wersja_daje_konflikt(
-        self, klient_zarzadca: TestClient, zabezpieczenie: dict[str, object]
+        self, klient: TestClient, zabezpieczenie: dict[str, object]
     ) -> None:
         tresc = {
             "rodzaj": "kaucja",
@@ -110,44 +77,25 @@ class TestZmianaZabezpieczenia:
             "wersja": zabezpieczenie["wersja"],
         }
         assert (
-            klient_zarzadca.put(
-                f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}", json=tresc
-            ).status_code
+            klient.put(f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}", json=tresc).status_code
             == 200
         )
         assert (
-            klient_zarzadca.put(
-                f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}", json=tresc
-            ).status_code
+            klient.put(f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}", json=tresc).status_code
             == 409
-        )
-
-    def test_podglad_nie_moze_zmienic(
-        self, klient: TestClient, baza: Session, zabezpieczenie: dict[str, object]
-    ) -> None:
-        klient.cookies.clear()
-        zaloguj_jako(klient, baza, RolaUzytkownika.PODGLAD)
-        assert (
-            klient.put(
-                f"/api/v1/zabezpieczenia/{zabezpieczenie['id']}",
-                json={"rodzaj": "kaucja", "status": "dostarczone", "wersja": 1},
-            ).status_code
-            == 403
         )
 
 
 class TestPelnaSciezka:
-    def test_od_budynku_do_alertu(self, klient_admin: TestClient) -> None:
+    def test_od_budynku_do_alertu(self, klient: TestClient) -> None:
         """To robi człowiek pierwszego dnia z programem.
 
         Test przechodzi całą drogę i sprawdza rzecz najważniejszą: wartość
         niezatwierdzona NIE pokazuje się jako czynsz, a po zatwierdzeniu — tak.
         """
-        budynek = klient_admin.post(
-            "/api/v1/budynki", json={"nazwa": "30X", "aktywny": True}
-        ).json()
+        budynek = klient.post("/api/v1/budynki", json={"nazwa": "30X", "aktywny": True}).json()
 
-        lokal = klient_admin.post(
+        lokal = klient.post(
             "/api/v1/lokale",
             json={
                 "budynek_id": budynek["id"],
@@ -157,11 +105,11 @@ class TestPelnaSciezka:
             },
         ).json()
 
-        najemca = klient_admin.post(
+        najemca = klient.post(
             "/api/v1/najemcy", json={"nazwa_pelna": "Firma Testowa sp. z o.o."}
         ).json()
 
-        okres = klient_admin.post(
+        okres = klient.post(
             "/api/v1/okresy-najmu",
             json={
                 "lokal_id": lokal["id"],
@@ -173,7 +121,7 @@ class TestPelnaSciezka:
         ).json()
         assert okres["data_zakonczenia_planowana"] == "2029-01-31"
 
-        parametr = klient_admin.post(
+        parametr = klient.post(
             f"/api/v1/okresy-najmu/{okres['id']}/parametry",
             json={
                 "klucz": "czynsz_podstawowy",
@@ -187,23 +135,21 @@ class TestPelnaSciezka:
         ).json()
         assert parametr["status_weryfikacji"] == "zaproponowana"
 
-        przed = klient_admin.get(f"/api/v1/lokale/{lokal['id']}/stan").json()
+        przed = klient.get(f"/api/v1/lokale/{lokal['id']}/stan").json()
         assert "czynsz_podstawowy" not in przed["parametry"]
 
-        klient_admin.post(
-            f"/api/v1/parametry/{parametr['id']}/decyzja", json={"status": "zatwierdzona"}
-        )
+        klient.post(f"/api/v1/parametry/{parametr['id']}/decyzja", json={"status": "zatwierdzona"})
 
-        po = klient_admin.get(f"/api/v1/lokale/{lokal['id']}/stan").json()
+        po = klient.get(f"/api/v1/lokale/{lokal['id']}/stan").json()
         assert po["parametry"]["czynsz_podstawowy"]["wartosc"] == "7400.00"
 
     def test_przeglad_przeterminowany_od_razu_po_dodaniu(
-        self, klient_zarzadca: TestClient, lokal_api: Lokal
+        self, klient: TestClient, lokal_api: Lokal
     ) -> None:
         """Przegląd sprzed pięciu lat z częstotliwością roczną jest przeterminowany
         w chwili wprowadzenia, a nie dopiero po nocnym przebiegu generatora.
         """
-        przeglad = klient_zarzadca.post(
+        przeglad = klient.post(
             "/api/v1/przeglady",
             json={
                 "lokal_id": lokal_api.id,
@@ -216,10 +162,8 @@ class TestPelnaSciezka:
         assert przeglad["status"] == "przeterminowany"
         assert przeglad["nastepny_przeglad_data"] == "2022-05-01"
 
-    def test_protokol_przesuwa_termin_do_przodu(
-        self, klient_zarzadca: TestClient, lokal_api: Lokal
-    ) -> None:
-        przeglad = klient_zarzadca.post(
+    def test_protokol_przesuwa_termin_do_przodu(self, klient: TestClient, lokal_api: Lokal) -> None:
+        przeglad = klient.post(
             "/api/v1/przeglady",
             json={
                 "lokal_id": lokal_api.id,
@@ -230,7 +174,7 @@ class TestPelnaSciezka:
             },
         ).json()
 
-        po = klient_zarzadca.post(
+        po = klient.post(
             f"/api/v1/przeglady/{przeglad['id']}/protokol?data_protokolu=2026-08-01"
         ).json()
         assert po["ostatni_przeglad_data"] == "2026-08-01"

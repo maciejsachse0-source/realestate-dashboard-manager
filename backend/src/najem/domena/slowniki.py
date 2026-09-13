@@ -10,15 +10,6 @@ ktorej nikt nie rozszyfruje przy zagladaniu do bazy przez psql.
 from enum import StrEnum
 
 
-class RolaUzytkownika(StrEnum):
-    """Koncepcja, sekcja 7.9. Kolejnosc od najmniejszych uprawnien."""
-
-    PODGLAD = "podglad"
-    OPERATOR = "operator"
-    ZARZADCA = "zarzadca"
-    ADMINISTRATOR = "administrator"
-
-
 class TypLokalu(StrEnum):
     HANDLOWY = "handlowy"
     BIUROWY = "biurowy"
@@ -58,6 +49,23 @@ class TypDokumentu(StrEnum):
     PROTOKOL_PRZEGLADU = "protokol_przegladu"
     WYPOWIEDZENIE = "wypowiedzenie"
     INNE = "inne"
+
+
+class TrybPrzechowywania(StrEnum):
+    """Gdzie lezy plik dokumentu.
+
+    KOPIA: plik zostal wgrany przez przegladarke i lezy w przechowalni systemu,
+    pod nazwa pochodzaca ze skrotu tresci. System odpowiada za jego trwalosc.
+
+    LINK: plik zostal wskazany na dysku i tam zostaje. W bazie jest sciezka
+    wzgledna wzgledem katalogu skanowanego. Program niczego nie kopiuje, wiec
+    przeniesienie albo przemianowanie pliku w Eksploratorze zrywa odnosnik --
+    stad ekran "Sprawdz dokumenty" i stad kopia zapasowa musi obejmowac
+    baze razem z katalogiem dokumentow uzytkownika.
+    """
+
+    KOPIA = "kopia"
+    LINK = "link"
 
 
 class StatusPrzetworzenia(StrEnum):

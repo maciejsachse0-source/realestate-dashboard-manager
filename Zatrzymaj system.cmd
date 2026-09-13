@@ -1,5 +1,6 @@
 @echo off
-rem Zatrzymuje baze danych, jesli zostala uruchomiona i nie wylaczyla sie sama.
-rem Potrzebne tylko wtedy, gdy okno programu zostalo zamkniete krzyzykiem.
-powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0narzedzia\lokalny-postgres.ps1" stop
+rem Zatrzymuje program i baze danych.
+rem Potrzebne wtedy, gdy okno programu zostalo zamkniete krzyzykiem: proces
+rem aplikacji potrafi wtedy zostac i trzymac port 8010.
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0narzedzia\zatrzymaj.ps1"
 timeout /t 3 >nul

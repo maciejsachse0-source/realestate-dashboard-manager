@@ -26,9 +26,24 @@ LIMIT_BAJTOW = 50 * 1024 * 1024
 #: Ile bajtów wystarczy, żeby rozpoznać typ.
 DLUGOSC_SYGNATURY = 8
 
+#: Ile początkowych bajtów przeszukujemy w archiwum OLE. Katalog strumieni
+#: leży blisko początku pliku, a przeszukiwanie całego kilkumegabajtowego
+#: dokumentu byłoby marnotrawstwem przy każdym skanie folderu.
+LIMIT_PRZESZUKANIA_OLE = 512 * 1024
+
+
+#: Sygnatura formatu OLE2: stary Office (.doc, .xls, .ppt) i kilkanascie
+#: innych formatow. Sama w sobie nie mowi, ktory to z nich.
+SYGNATURA_OLE = bytes.fromhex("d0cf11e0a1b11ae1")
+
+#: Nazwa strumienia w archiwum OLE, po ktorej poznajemy dokument Worda.
+#: W pliku lezy jako UTF-16LE, stad zera miedzy literami.
+STRUMIEN_WORDA = "WordDocument".encode("utf-16-le")
+
 
 class TypPliku(StrEnum):
     PDF = "application/pdf"
+    DOC = "application/msword"
     DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     JPEG = "image/jpeg"
@@ -38,6 +53,7 @@ class TypPliku(StrEnum):
 #: Rozszerzenie nadawane plikowi w przechowalni. Nazwa z uploadu nie jest używana.
 ROZSZERZENIA: dict[TypPliku, str] = {
     TypPliku.PDF: ".pdf",
+    TypPliku.DOC: ".doc",
     TypPliku.DOCX: ".docx",
     TypPliku.XLSX: ".xlsx",
     TypPliku.JPEG: ".jpg",
@@ -46,7 +62,7 @@ ROZSZERZENIA: dict[TypPliku, str] = {
 
 #: Co wolno wgrać jako dokument umowy. Arkusze idą osobną ścieżką importu.
 DOZWOLONE_DOKUMENTY: frozenset[TypPliku] = frozenset(
-    {TypPliku.PDF, TypPliku.DOCX, TypPliku.JPEG, TypPliku.PNG}
+    {TypPliku.PDF, TypPliku.DOC, TypPliku.DOCX, TypPliku.JPEG, TypPliku.PNG}
 )
 
 
@@ -86,8 +102,12 @@ def rozpoznaj_typ(zawartosc: bytes) -> TypPliku:
     if zawartosc.startswith(b"PK\x03\x04"):
         return _typ_archiwum(zawartosc)
 
+    # Stary format Office. Umowy sprzed lat bywają zapisane właśnie tak.
+    if zawartosc.startswith(SYGNATURA_OLE):
+        return _typ_ole(zawartosc)
+
     raise BladPliku(
-        "Nieobsługiwany typ pliku. Przyjmujemy PDF, DOCX, JPEG i PNG. "
+        "Nieobsługiwany typ pliku. Przyjmujemy PDF, DOC, DOCX, JPEG i PNG. "
         "Liczy się zawartość pliku, nie jego rozszerzenie."
     )
 
@@ -104,6 +124,21 @@ def _typ_archiwum(zawartosc: bytes) -> TypPliku:
     if any(nazwa.startswith("xl/") for nazwa in nazwy):
         return TypPliku.XLSX
     raise BladPliku("Archiwum nie jest dokumentem Worda ani arkuszem Excela.")
+
+
+def _typ_ole(zawartosc: bytes) -> TypPliku:
+    """Rozroznienie .doc od .xls i .ppt wewnatrz wspolnej sygnatury OLE.
+
+    Pelne parsowanie struktury OLE byloby tu przerostem formy: wystarczy,
+    ze w katalogu archiwum stoi nazwa strumienia "WordDocument". Arkusz ma
+    w tym miejscu "Workbook", a prezentacja "PowerPoint Document".
+    """
+    if STRUMIEN_WORDA in zawartosc[:LIMIT_PRZESZUKANIA_OLE]:
+        return TypPliku.DOC
+    raise BladPliku(
+        "Plik jest dokumentem starego pakietu Office, ale nie dokumentem Worda. "
+        "Arkusze wgrywa się przez import z arkusza."
+    )
 
 
 def przyjmij_plik(
@@ -153,16 +188,38 @@ def przyjmij_plik(
     )
 
 
-def wczytaj_plik(sciezka_wzgledna: str, *, katalog: Path) -> bytes:
-    """Treść pliku z przechowalni.
+def sciezka_w_katalogu(sciezka_wzgledna: str, *, katalog: Path) -> Path:
+    """Ścieżka bezwzględna do pliku, sprawdzona, że nie wychodzi poza katalog.
 
-    Ścieżka pochodzi z bazy, ale i tak sprawdzamy, czy nie wychodzi poza katalog:
-    jedna pomyłka przy imporcie danych nie może pozwolić na czytanie
-    dowolnego pliku z dysku.
+    Ścieżka pochodzi z bazy, ale i tak ją sprawdzamy: jedna pomyłka przy
+    imporcie danych nie może pozwolić na czytanie dowolnego pliku z dysku.
     """
-    docelowa = (katalog / sciezka_wzgledna).resolve()
+    try:
+        docelowa = (katalog / sciezka_wzgledna).resolve()
+    except OSError as blad:
+        # Ścieżka sieciowa albo zbyt długa dla systemu plików. `resolve()`
+        # próbuje wtedy sięgnąć do zasobu i podnosi OSError, który bez tego
+        # przechwycenia wychodzi z API jako 500 zamiast czytelnej odmowy.
+        raise BladPliku("Tej ścieżki nie da się odczytać w tym systemie.") from blad
+
     if not docelowa.is_relative_to(katalog.resolve()):
-        raise BladPliku("Ścieżka pliku wychodzi poza katalog dokumentów.")
+        raise BladPliku("Ścieżka pliku wychodzi poza dozwolony katalog.")
+    return docelowa
+
+
+def wczytaj_plik(
+    sciezka_wzgledna: str,
+    *,
+    katalog: Path,
+    brak: str = "Pliku nie ma w przechowalni. Mógł zostać usunięty ręcznie.",
+) -> bytes:
+    """Treść pliku z katalogu dokumentów albo z katalogu skanowanego.
+
+    Komunikat o braku pliku jest parametrem, bo znaczy co innego w każdym
+    z tych dwóch miejsc. Zniknięcie pliku z przechowalni to awaria, a
+    zniknięcie zlinkowanego pliku to zwykłe przeniesienie go w Eksploratorze.
+    """
+    docelowa = sciezka_w_katalogu(sciezka_wzgledna, katalog=katalog)
     if not docelowa.is_file():
-        raise BladPliku("Pliku nie ma w przechowalni. Mógł zostać usunięty ręcznie.")
+        raise BladPliku(brak)
     return docelowa.read_bytes()

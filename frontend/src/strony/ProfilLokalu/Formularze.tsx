@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from "react";
 
 import {
   useDodajOkresNajmu,
@@ -7,7 +7,7 @@ import {
   useDodajSkladnik,
   useDodajZabezpieczenie,
   useNajemcy,
-} from '@/api/zapytania'
+} from "@/api/zapytania";
 import {
   DialogFormularza,
   PoleTekstowe,
@@ -15,22 +15,22 @@ import {
   PoleZaznaczenia,
   liczbaLubNull,
   pustyNaNull,
-} from '@/komponenty/Formularz'
+} from "@/komponenty/Formularz";
 
 const MIESIACE = [
-  'styczeń',
-  'luty',
-  'marzec',
-  'kwiecień',
-  'maj',
-  'czerwiec',
-  'lipiec',
-  'sierpień',
-  'wrzesień',
-  'październik',
-  'listopad',
-  'grudzień',
-].map((nazwa, indeks) => ({ wartosc: String(indeks + 1), etykieta: nazwa }))
+  "styczeń",
+  "luty",
+  "marzec",
+  "kwiecień",
+  "maj",
+  "czerwiec",
+  "lipiec",
+  "sierpień",
+  "wrzesień",
+  "październik",
+  "listopad",
+  "grudzień",
+].map((nazwa, indeks) => ({ wartosc: String(indeks + 1), etykieta: nazwa }));
 
 /** Nowa umowa dla lokalu. Bez niej lokal nie ma czego pokazywać. */
 export function FormularzUmowy({
@@ -38,20 +38,20 @@ export function FormularzUmowy({
   onZamknij,
   lokalId,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  lokalId: number
+  otwarty: boolean;
+  onZamknij: () => void;
+  lokalId: number;
 }) {
-  const dodaj = useDodajOkresNajmu()
-  const najemcy = useNajemcy()
-  const [najemcaId, setNajemcaId] = useState('')
-  const [dataZawarcia, setDataZawarcia] = useState('')
-  const [dataPrzekazania, setDataPrzekazania] = useState('')
-  const [bazuje, setBazuje] = useState('data_przekazania')
-  const [okresMiesiace, setOkresMiesiace] = useState('')
-  const [wypowiedzenie, setWypowiedzenie] = useState('')
-  const [waloryzacja, setWaloryzacja] = useState(false)
-  const [miesiacWaloryzacji, setMiesiacWaloryzacji] = useState('1')
+  const dodaj = useDodajOkresNajmu();
+  const najemcy = useNajemcy();
+  const [najemcaId, setNajemcaId] = useState("");
+  const [dataZawarcia, setDataZawarcia] = useState("");
+  const [dataPrzekazania, setDataPrzekazania] = useState("");
+  const [bazuje, setBazuje] = useState("data_przekazania");
+  const [okresMiesiace, setOkresMiesiace] = useState("");
+  const [wypowiedzenie, setWypowiedzenie] = useState("");
+  const [waloryzacja, setWaloryzacja] = useState(false);
+  const [miesiacWaloryzacji, setMiesiacWaloryzacji] = useState("1");
 
   return (
     <DialogFormularza
@@ -110,8 +110,8 @@ export function FormularzUmowy({
         wymagane
         pusteEtykieta=""
         opcje={[
-          { wartosc: 'data_przekazania', etykieta: 'daty przekazania lokalu' },
-          { wartosc: 'data_zawarcia', etykieta: 'daty zawarcia umowy' },
+          { wartosc: "data_przekazania", etykieta: "daty przekazania lokalu" },
+          { wartosc: "data_zawarcia", etykieta: "daty zawarcia umowy" },
         ]}
       />
       <PoleTekstowe
@@ -148,7 +148,7 @@ export function FormularzUmowy({
         />
       )}
     </DialogFormularza>
-  )
+  );
 }
 
 /**
@@ -162,22 +162,22 @@ export function FormularzParametru({
   onZamknij,
   okresId,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  okresId: number
+  otwarty: boolean;
+  onZamknij: () => void;
+  okresId: number;
 }) {
-  const dodaj = useDodajParametr()
-  const [klucz, setKlucz] = useState('czynsz_podstawowy')
-  const [typ, setTyp] = useState('kwota')
-  const [kwota, setKwota] = useState('')
-  const [rodzaj, setRodzaj] = useState('netto')
-  const [vat, setVat] = useState('23')
-  const [liczba, setLiczba] = useState('')
-  const [data, setData] = useState('')
-  const [tekst, setTekst] = useState('')
-  const [obowiazujeOd, setObowiazujeOd] = useState('')
-  const [paragraf, setParagraf] = useState('')
-  const [strona, setStrona] = useState('')
+  const dodaj = useDodajParametr();
+  const [klucz, setKlucz] = useState("czynsz_podstawowy");
+  const [typ, setTyp] = useState("kwota");
+  const [kwota, setKwota] = useState("");
+  const [rodzaj, setRodzaj] = useState("netto");
+  const [vat, setVat] = useState("23");
+  const [liczba, setLiczba] = useState("");
+  const [data, setData] = useState("");
+  const [tekst, setTekst] = useState("");
+  const [obowiazujeOd, setObowiazujeOd] = useState("");
+  const [paragraf, setParagraf] = useState("");
+  const [strona, setStrona] = useState("");
 
   return (
     <DialogFormularza
@@ -192,13 +192,14 @@ export function FormularzParametru({
             klucz: klucz.trim(),
             typ_wartosci: typ,
             obowiazuje_od: obowiazujeOd,
-            wartosc_kwota: typ === 'kwota' ? liczbaLubNull(kwota) : null,
-            wartosc_waluta: typ === 'kwota' ? 'PLN' : null,
-            wartosc_rodzaj_kwoty: typ === 'kwota' ? rodzaj : null,
-            wartosc_stawka_vat: typ === 'kwota' && rodzaj === 'netto' ? liczbaLubNull(vat) : null,
-            wartosc_liczba: typ === 'liczba' ? liczbaLubNull(liczba) : null,
-            wartosc_data: typ === 'data' ? pustyNaNull(data) : null,
-            wartosc_tekst: typ === 'tekst' ? pustyNaNull(tekst) : null,
+            wartosc_kwota: typ === "kwota" ? liczbaLubNull(kwota) : null,
+            wartosc_waluta: typ === "kwota" ? "PLN" : null,
+            wartosc_rodzaj_kwoty: typ === "kwota" ? rodzaj : null,
+            wartosc_stawka_vat:
+              typ === "kwota" && rodzaj === "netto" ? liczbaLubNull(vat) : null,
+            wartosc_liczba: typ === "liczba" ? liczbaLubNull(liczba) : null,
+            wartosc_data: typ === "data" ? pustyNaNull(data) : null,
+            wartosc_tekst: typ === "tekst" ? pustyNaNull(tekst) : null,
             zrodlo_paragraf: pustyNaNull(paragraf),
             zrodlo_strona: liczbaLubNull(strona),
           },
@@ -214,10 +215,13 @@ export function FormularzParametru({
         wymagane
         pusteEtykieta=""
         opcje={[
-          { wartosc: 'czynsz_podstawowy', etykieta: 'Czynsz podstawowy' },
-          { wartosc: 'oplata_eksploatacyjna', etykieta: 'Opłata eksploatacyjna' },
-          { wartosc: 'stawka_m2', etykieta: 'Stawka za m²' },
-          { wartosc: 'powierzchnia', etykieta: 'Powierzchnia z umowy' },
+          { wartosc: "czynsz_podstawowy", etykieta: "Czynsz podstawowy" },
+          {
+            wartosc: "oplata_eksploatacyjna",
+            etykieta: "Opłata eksploatacyjna",
+          },
+          { wartosc: "stawka_m2", etykieta: "Stawka za m²" },
+          { wartosc: "powierzchnia", etykieta: "Powierzchnia z umowy" },
         ]}
       />
       <PoleWyboru
@@ -228,14 +232,14 @@ export function FormularzParametru({
         wymagane
         pusteEtykieta=""
         opcje={[
-          { wartosc: 'kwota', etykieta: 'Kwota' },
-          { wartosc: 'liczba', etykieta: 'Liczba' },
-          { wartosc: 'data', etykieta: 'Data' },
-          { wartosc: 'tekst', etykieta: 'Tekst' },
+          { wartosc: "kwota", etykieta: "Kwota" },
+          { wartosc: "liczba", etykieta: "Liczba" },
+          { wartosc: "data", etykieta: "Data" },
+          { wartosc: "tekst", etykieta: "Tekst" },
         ]}
       />
 
-      {typ === 'kwota' && (
+      {typ === "kwota" && (
         <>
           <PoleTekstowe
             nazwa="kwota"
@@ -254,12 +258,12 @@ export function FormularzParametru({
             wymagane
             pusteEtykieta=""
             opcje={[
-              { wartosc: 'netto', etykieta: 'netto' },
-              { wartosc: 'brutto', etykieta: 'brutto' },
+              { wartosc: "netto", etykieta: "netto" },
+              { wartosc: "brutto", etykieta: "brutto" },
             ]}
             podpowiedz="Kwota bez tej informacji nie jest kwotą — nie da się jej przeliczyć."
           />
-          {rodzaj === 'netto' && (
+          {rodzaj === "netto" && (
             <PoleTekstowe
               nazwa="vat"
               etykieta="Stawka VAT (%)"
@@ -273,7 +277,7 @@ export function FormularzParametru({
         </>
       )}
 
-      {typ === 'liczba' && (
+      {typ === "liczba" && (
         <PoleTekstowe
           nazwa="liczba"
           etykieta="Wartość"
@@ -285,7 +289,7 @@ export function FormularzParametru({
         />
       )}
 
-      {typ === 'data' && (
+      {typ === "data" && (
         <PoleTekstowe
           nazwa="wartosc_data"
           etykieta="Data"
@@ -296,8 +300,14 @@ export function FormularzParametru({
         />
       )}
 
-      {typ === 'tekst' && (
-        <PoleTekstowe nazwa="tekst" etykieta="Treść" wartosc={tekst} onZmiana={setTekst} wymagane />
+      {typ === "tekst" && (
+        <PoleTekstowe
+          nazwa="tekst"
+          etykieta="Treść"
+          wartosc={tekst}
+          onZmiana={setTekst}
+          wymagane
+        />
       )}
 
       <PoleTekstowe
@@ -325,7 +335,7 @@ export function FormularzParametru({
         onZmiana={setStrona}
       />
     </DialogFormularza>
-  )
+  );
 }
 
 /** Składnik opłaty: co jest płatne i którego dnia (reguła R3). */
@@ -334,16 +344,16 @@ export function FormularzSkladnika({
   onZamknij,
   okresId,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  okresId: number
+  otwarty: boolean;
+  onZamknij: () => void;
+  okresId: number;
 }) {
-  const dodaj = useDodajSkladnik()
-  const [nazwa, setNazwa] = useState('')
-  const [klucz, setKlucz] = useState('czynsz_podstawowy')
-  const [dzien, setDzien] = useState('')
-  const [waloryzowany, setWaloryzowany] = useState(false)
-  const [sposob, setSposob] = useState('')
+  const dodaj = useDodajSkladnik();
+  const [nazwa, setNazwa] = useState("");
+  const [klucz, setKlucz] = useState("czynsz_podstawowy");
+  const [dzien, setDzien] = useState("");
+  const [waloryzowany, setWaloryzowany] = useState(false);
+  const [sposob, setSposob] = useState("");
 
   return (
     <DialogFormularza
@@ -381,8 +391,11 @@ export function FormularzSkladnika({
         wymagane
         pusteEtykieta=""
         opcje={[
-          { wartosc: 'czynsz_podstawowy', etykieta: 'Czynsz podstawowy' },
-          { wartosc: 'oplata_eksploatacyjna', etykieta: 'Opłata eksploatacyjna' },
+          { wartosc: "czynsz_podstawowy", etykieta: "Czynsz podstawowy" },
+          {
+            wartosc: "oplata_eksploatacyjna",
+            etykieta: "Opłata eksploatacyjna",
+          },
         ]}
       />
       <PoleTekstowe
@@ -409,7 +422,7 @@ export function FormularzSkladnika({
         podpowiedz="Gdy kwoty nie da się podać wprost, na przykład: wg zużycia licznikowego."
       />
     </DialogFormularza>
-  )
+  );
 }
 
 /** Kaucja, weksel, gwarancja albo polisa (reguły R4, R5, R6). */
@@ -418,17 +431,17 @@ export function FormularzZabezpieczenia({
   onZamknij,
   okresId,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  okresId: number
+  otwarty: boolean;
+  onZamknij: () => void;
+  okresId: number;
 }) {
-  const dodaj = useDodajZabezpieczenie()
-  const [rodzaj, setRodzaj] = useState('')
-  const [wartosc, setWartosc] = useState('')
-  const [rodzajKwoty, setRodzajKwoty] = useState('brutto')
-  const [sposob, setSposob] = useState('')
-  const [wymagalnosc, setWymagalnosc] = useState('')
-  const [waznosc, setWaznosc] = useState('')
+  const dodaj = useDodajZabezpieczenie();
+  const [rodzaj, setRodzaj] = useState("");
+  const [wartosc, setWartosc] = useState("");
+  const [rodzajKwoty, setRodzajKwoty] = useState("brutto");
+  const [sposob, setSposob] = useState("");
+  const [wymagalnosc, setWymagalnosc] = useState("");
+  const [waznosc, setWaznosc] = useState("");
 
   return (
     <DialogFormularza
@@ -440,11 +453,12 @@ export function FormularzZabezpieczenia({
           okresId,
           dane: {
             rodzaj,
-            status: 'wymagane',
+            status: "wymagane",
             wymagana_wartosc: liczbaLubNull(wartosc),
-            wymagana_waluta: wartosc.trim() ? 'PLN' : null,
+            wymagana_waluta: wartosc.trim() ? "PLN" : null,
             wymagana_rodzaj_kwoty: wartosc.trim() ? rodzajKwoty : null,
-            wymagana_stawka_vat: wartosc.trim() && rodzajKwoty === 'netto' ? 23 : null,
+            wymagana_stawka_vat:
+              wartosc.trim() && rodzajKwoty === "netto" ? 23 : null,
             sposob_wyliczenia: pustyNaNull(sposob),
             data_wymagalnosci: pustyNaNull(wymagalnosc),
             data_waznosci: pustyNaNull(waznosc),
@@ -460,10 +474,10 @@ export function FormularzZabezpieczenia({
         onZmiana={setRodzaj}
         wymagane
         opcje={[
-          { wartosc: 'kaucja', etykieta: 'Kaucja' },
-          { wartosc: 'weksel', etykieta: 'Weksel' },
-          { wartosc: 'gwarancja_bankowa', etykieta: 'Gwarancja bankowa' },
-          { wartosc: 'polisa', etykieta: 'Polisa' },
+          { wartosc: "kaucja", etykieta: "Kaucja" },
+          { wartosc: "weksel", etykieta: "Weksel" },
+          { wartosc: "gwarancja_bankowa", etykieta: "Gwarancja bankowa" },
+          { wartosc: "polisa", etykieta: "Polisa" },
         ]}
       />
       <PoleTekstowe
@@ -475,7 +489,7 @@ export function FormularzZabezpieczenia({
         wartosc={wartosc}
         onZmiana={setWartosc}
       />
-      {wartosc.trim() !== '' && (
+      {wartosc.trim() !== "" && (
         <PoleWyboru
           nazwa="rodzaj_kwoty"
           etykieta="Netto czy brutto"
@@ -484,8 +498,8 @@ export function FormularzZabezpieczenia({
           wymagane
           pusteEtykieta=""
           opcje={[
-            { wartosc: 'brutto', etykieta: 'brutto' },
-            { wartosc: 'netto', etykieta: 'netto' },
+            { wartosc: "brutto", etykieta: "brutto" },
+            { wartosc: "netto", etykieta: "netto" },
           ]}
         />
       )}
@@ -503,7 +517,7 @@ export function FormularzZabezpieczenia({
         wartosc={wymagalnosc}
         onZmiana={setWymagalnosc}
       />
-      {rodzaj === 'polisa' && (
+      {rodzaj === "polisa" && (
         <PoleTekstowe
           nazwa="waznosc"
           etykieta="Polisa ważna do"
@@ -514,7 +528,7 @@ export function FormularzZabezpieczenia({
         />
       )}
     </DialogFormularza>
-  )
+  );
 }
 
 /** Obowiązek przeglądu okresowego (reguła R7). */
@@ -523,15 +537,15 @@ export function FormularzPrzegladu({
   onZamknij,
   lokalId,
 }: {
-  otwarty: boolean
-  onZamknij: () => void
-  lokalId: number
+  otwarty: boolean;
+  onZamknij: () => void;
+  lokalId: number;
 }) {
-  const dodaj = useDodajPrzeglad()
-  const [element, setElement] = useState('')
-  const [ktoObciazany, setKtoObciazany] = useState('najemca')
-  const [czestotliwosc, setCzestotliwosc] = useState('12')
-  const [ostatni, setOstatni] = useState('')
+  const dodaj = useDodajPrzeglad();
+  const [element, setElement] = useState("");
+  const [ktoObciazany, setKtoObciazany] = useState("najemca");
+  const [czestotliwosc, setCzestotliwosc] = useState("12");
+  const [ostatni, setOstatni] = useState("");
 
   return (
     <DialogFormularza
@@ -566,8 +580,8 @@ export function FormularzPrzegladu({
         wymagane
         pusteEtykieta=""
         opcje={[
-          { wartosc: 'najemca', etykieta: 'najemcę' },
-          { wartosc: 'wynajmujacy', etykieta: 'wynajmującego' },
+          { wartosc: "najemca", etykieta: "najemcę" },
+          { wartosc: "wynajmujacy", etykieta: "wynajmującego" },
         ]}
       />
       <PoleTekstowe
@@ -587,5 +601,5 @@ export function FormularzPrzegladu({
         podpowiedz="Bez niej termin kolejnego pozostanie nieustalony — a to nie to samo, co aktualny."
       />
     </DialogFormularza>
-  )
+  );
 }

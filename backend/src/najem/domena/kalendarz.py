@@ -137,3 +137,15 @@ def dzien_miesiaca(rok: int, miesiac: int, dzien: int) -> date:
         raise ValueError(f"Dzień miesiąca musi mieścić się między 1 a 31, otrzymano {dzien}.")
     ostatni = calendar.monthrange(rok, miesiac)[1]
     return date(rok, miesiac, min(dzien, ostatni))
+
+
+def dni_do(termin: date, dzisiaj: date) -> int:
+    """Ile dni zostalo do terminu. Ujemnie, gdy termin juz minal.
+
+    Zero znaczy "dzis", nie "brak danych" -- to rozroznienie jest wazne
+    na kokpicie terminow, gdzie zero i brak wygladalyby tak samo.
+
+    "Dzisiaj" jest argumentem, a nie odczytem zegara w srodku: inaczej testu
+    tej funkcji nie da sie napisac deterministycznie.
+    """
+    return (termin - dzisiaj).days

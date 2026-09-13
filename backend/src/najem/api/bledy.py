@@ -10,7 +10,6 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 
-from najem.auth.haslo import SlabeHaslo
 from najem.domena.stany import NiedozwolonePrzejscie
 
 log = structlog.get_logger(__name__)
@@ -38,13 +37,6 @@ def zarejestruj_handlery(app: FastAPI) -> None:
     async def zle_przejscie(_: Request, blad: NiedozwolonePrzejscie) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={"detail": str(blad)},
-        )
-
-    @app.exception_handler(SlabeHaslo)
-    async def slabe_haslo(_: Request, blad: SlabeHaslo) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(blad)},
         )
 

@@ -160,7 +160,7 @@ Najemca jest osobnym bytem, nie polem w umowie, bo ten sam podmiot może wynajmo
 | `dokument_zrodlowy_id` | z czego to wynika |
 | `lokalizacja_w_dokumencie` | strona, paragraf, offset tekstu |
 | `status_weryfikacji` | zaproponowana / zatwierdzona / poprawiona |
-| `zatwierdzil_uzytkownik_id`, `zatwierdzono_dnia` | ślad audytowy |
+| ~~`zatwierdzil_uzytkownik_id`~~, `zatwierdzono_dnia` | ślad audytowy — została sama data, kolumny „kto" nie ma ([ADR 009](decyzje/009-usuniecie-logowania.md)) |
 
 Zapytanie o "stan na dziś" to zawsze: weź dla każdego klucza wiersz, gdzie `obowiazuje_od <= dziś` i (`obowiazuje_do` jest null lub `>= dziś`), o najpóźniejszym `obowiazuje_od`.
 
@@ -210,7 +210,7 @@ Zgodnie z decyzją: **lokalna aplikacja webowa** uruchamiana na wewnętrznym ser
 | Frontend | React (Next.js lub Vite) + biblioteka tabel z filtrowaniem | dashboard to w 80% jedna bardzo dobra tabela |
 | Kolejka zadań | prosty worker w tle (RQ / Celery / APScheduler) | OCR i ekstrakcja nie mogą blokować requestu |
 | Pliki | katalog na serwerze + hash w bazie | brak chmury, backup na poziomie infrastruktury |
-| Auth | logowanie wewnętrzne lub integracja z AD/LDAP | dostęp tylko dla uprawnionych pracowników |
+| ~~Auth~~ | ~~logowanie wewnętrzne lub integracja z AD/LDAP~~ | **NIEZREALIZOWANE.** Logowanie zbudowano w E4 i usunięto 28.08.2026 — [ADR 009](decyzje/009-usuniecie-logowania.md) |
 
 ### 4.2 Warstwy
 
@@ -456,7 +456,7 @@ Kanały: panel w aplikacji (zawsze), e-mail podsumowujący (dzienny lub tygodnio
 
 ### 7.1 Ekran 1: DASHBOARD (widok zbiorczy)
 
-Domyślny ekran po zalogowaniu. Jedna tabela lokali, bardzo dobra tabela.
+Ekran startowy programu. Jedna tabela lokali, bardzo dobra tabela.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -590,9 +590,16 @@ Eksport XLSX i CSV. Bez integracji zewnętrznych w pierwszej fazie.
 
 ### 7.8 Ekran 8: ADMIN
 
-Użytkownicy i role, budynki i lokale (kartoteka), słowniki (typy dokumentów, elementy przeglądów, składniki opłat), wskaźniki waloryzacji, konfiguracja alertów (progi dni), log audytu, kopie zapasowe.
+~~Użytkownicy i role~~, budynki i lokale (kartoteka), słowniki (typy dokumentów, elementy przeglądów, składniki opłat), wskaźniki waloryzacji, konfiguracja alertów (progi dni), log audytu, kopie zapasowe.
+
+> **Nieaktualne:** użytkowników i ról nie ma — [ADR 009](decyzje/009-usuniecie-logowania.md).
 
 ### 7.9 Role i uprawnienia
+
+> **NIEAKTUALNE od 28.08.2026.** Program nie ma logowania ani ról. Każdy, kto ma
+> dostęp do komputera, ma dostęp do wszystkiego. Tabela poniżej opisuje pierwotny
+> zamysł i to, co trzeba by odbudować, gdyby program miał obsłużyć więcej niż
+> jedną osobę. Powód i konsekwencje: [ADR 009](decyzje/009-usuniecie-logowania.md).
 
 | Rola | Zakres |
 |---|---|
@@ -613,8 +620,12 @@ Specyfikacja stawia to jako wymóg twardy, więc traktuję to jako ograniczenie 
 2. **Zero chmurowego AI.** Żadnych wywołań do zewnętrznych API modeli. Ekstrakcja: reguły + model uruchamiany lokalnie.
 3. **Blokada wychodząca na poziomie infrastruktury.** Nie ufamy deklaracji w kodzie. Firewall po stronie serwera z listą dozwoloną, domyślnie pustą. To jedyna gwarancja, że przypadkowa zależność nie wyśle danych na zewnątrz.
 4. **Anonimizacja jako druga warstwa.** Dokumenty poddawane ekstrakcji nie zawierają danych identyfikacyjnych. Dane poufne wprowadza człowiek bezpośrednio w aplikacji, poza torem przetwarzania automatycznego.
-5. **Dostęp wyłącznie dla uprawnionych.** Logowanie imienne, role, brak kont współdzielonych.
-6. **Pełny audyt.** Każdy odczyt danych wrażliwych i każda zmiana są logowane.
+5. ~~**Dostęp wyłącznie dla uprawnionych.** Logowanie imienne, role, brak kont współdzielonych.~~
+   **NIE OBOWIĄZUJE od 28.08.2026** ([ADR 009](decyzje/009-usuniecie-logowania.md)). Program nie ma logowania ani ról.
+   Dostępu pilnuje dostęp do komputera, na którym stoi.
+6. **Pełny audyt.** Każdy odczyt danych wrażliwych i każda zmiana są logowane —
+   **z jednym wyjątkiem**: log zapisuje co, kiedy i z jakiej wartości na jaką,
+   ale nie **kto**, bo nie ma pojęcia użytkownika ([ADR 009](decyzje/009-usuniecie-logowania.md)).
 7. **Szyfrowanie.** Baza i katalog dokumentów na zaszyfrowanym wolumenie. Kopie zapasowe szyfrowane, testowane z odtworzenia.
 8. **RODO.** Dane najemców będących osobami fizycznymi to dane osobowe. Potrzebne: rejestr czynności przetwarzania, polityka retencji (ile lat po zakończeniu umowy), procedura usunięcia.
 
@@ -653,7 +664,7 @@ Zakres:
 - generator zdarzeń i kokpit terminów,
 - reguły: data zakończenia, polisa, kaucja, przeglądy,
 - eksport do XLSX,
-- role i audyt.
+- ~~role~~ i audyt (role usunięte — [ADR 009](decyzje/009-usuniecie-logowania.md)).
 
 **Po tej fazie system już przynosi wartość**, nawet jeśli dane wprowadza się ręcznie. To ważne, bo daje czas na dopracowanie ekstrakcji bez presji.
 

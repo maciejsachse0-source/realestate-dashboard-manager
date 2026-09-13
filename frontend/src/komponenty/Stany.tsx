@@ -1,4 +1,4 @@
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Cztery stany widoku danych: ładowanie, pusty, błąd, dane.
@@ -15,7 +15,7 @@ export function Ladowanie({ wierszy = 8 }: { wierszy?: number }) {
         <Skeleton key={i} className="h-10 w-full" />
       ))}
     </div>
-  )
+  );
 }
 
 export function Pusto({
@@ -23,27 +23,39 @@ export function Pusto({
   opis,
   akcja,
 }: {
-  tytul: string
-  opis: string
-  akcja?: React.ReactNode
+  tytul: string;
+  opis: string;
+  akcja?: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-dashed p-12 text-center">
       <p className="font-medium">{tytul}</p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{opis}</p>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {opis}
+      </p>
       {akcja && <div className="mt-4">{akcja}</div>}
     </div>
-  )
+  );
 }
 
-export function Blad({ komunikat, ponow }: { komunikat: string; ponow?: () => void }) {
+export function Blad({
+  komunikat,
+  ponow,
+}: {
+  komunikat: string;
+  ponow?: () => void;
+}) {
   return (
     <div
       role="alert"
       className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center"
     >
-      <p className="font-medium text-destructive">Nie udało się wczytać danych</p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{komunikat}</p>
+      <p className="font-medium text-destructive">
+        Nie udało się wczytać danych
+      </p>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {komunikat}
+      </p>
       {ponow && (
         <button
           type="button"
@@ -54,5 +66,5 @@ export function Blad({ komunikat, ponow }: { komunikat: string; ponow?: () => vo
         </button>
       )}
     </div>
-  )
+  );
 }

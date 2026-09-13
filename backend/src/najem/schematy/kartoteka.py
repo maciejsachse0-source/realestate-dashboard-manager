@@ -6,7 +6,6 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from najem.domena.slowniki import (
-    RolaUzytkownika,
     StatusLokalu,
     StatusOkresuNajmu,
     TypLokalu,
@@ -24,6 +23,10 @@ class Odczyt(BaseModel):
 
 class BudynekWejscie(BaseModel):
     nazwa: str = Field(min_length=1, max_length=80)
+    #: Nazwa katalogu tego budynku na dysku, gdy rozni sie od nazwy budynku.
+    #: Puste znaczy "szukaj folderu o tej samej nazwie", a nie "nie skanuj" --
+    #: wiekszosc budynkow nie bedzie tego pola potrzebowala.
+    nazwa_folderu: str | None = Field(default=None, max_length=200)
     adres: str | None = Field(default=None, max_length=2000)
     aktywny: bool = True
     uwagi: str | None = None
@@ -42,6 +45,7 @@ class BudynekZmiana(BudynekWejscie):
 class BudynekWyjscie(Odczyt):
     id: int
     nazwa: str
+    nazwa_folderu: str | None
     adres: str | None
     aktywny: bool
     uwagi: str | None
@@ -158,17 +162,6 @@ class NajemcaWyjscie(Odczyt):
     wersja: int
 
 
-class UzytkownikNaLiscie(Odczyt):
-    """Minimum potrzebne do wyboru osoby na liście. Nic ponad to."""
-
-    id: int
-    imie_nazwisko: str
-    rola: RolaUzytkownika
-
-
-# ------------------------------------------------------------ stan na dzien
-
-
 class WartoscStanu(BaseModel):
     """Jedna pozycja stanu efektywnego wraz ze sladem do zrodla.
 
@@ -208,10 +201,13 @@ class ZdarzenieWyjscie(Odczyt):
     encja_id: int
     lokal_id: int | None
     data_zdarzenia: date
+    #: Ile dni zostalo do terminu; ujemnie, gdy termin minal. Liczone po stronie
+    #: API, bo interfejs ma wyswietlac, a nie liczyc. Wypelniane po odczycie
+    #: z bazy, wiec w modelu ORM odpowiednika nie ma.
+    dni_do_terminu: int | None = None
     waga: str
     status: str
     tresc: str
-    przypisany_uzytkownik_id: int | None
     odroczone_do: date | None
     obsluzone_dnia: datetime | None
     notatka: str | None
@@ -225,7 +221,3 @@ class ObslugaZdarzenia(BaseModel):
 class OdroczenieZdarzenia(BaseModel):
     odroczone_do: date
     notatka: str | None = Field(default=None, max_length=2000)
-
-
-class PrzypisanieZdarzenia(BaseModel):
-    uzytkownik_id: int | None

@@ -365,7 +365,6 @@ def zatwierdz(
     rok: int,
     okresy_do_zatwierdzenia: set[int],
     *,
-    uzytkownik_id: int,
     adres_ip: str | None = None,
 ) -> WynikZatwierdzenia:
     """Zapisuje wybrane propozycje. Wywolujacy odpowiada za `commit()`.
@@ -415,7 +414,6 @@ def zatwierdz(
             # kwote przed i po. To jest ta sama decyzja, co przy pojedynczym
             # zatwierdzeniu, tylko wykonana hurtowo (decyzja D4).
             status_weryfikacji=StatusWeryfikacji.ZATWIERDZONA,
-            zatwierdzil_uzytkownik_id=uzytkownik_id,
             zatwierdzono_dnia=teraz,
             uwagi=(
                 f"Waloryzacja {rok}: {propozycja.kwota_stara.wartosc} razy "
@@ -428,7 +426,6 @@ def zatwierdz(
             sesja,
             parametr,
             operacja=OperacjaAudytu.UTWORZENIE,
-            uzytkownik_id=uzytkownik_id,
             adres_ip=adres_ip,
         )
         wynik.umow_zwaloryzowanych += 1

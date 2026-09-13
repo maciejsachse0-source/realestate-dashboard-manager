@@ -1,51 +1,46 @@
-import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { pobierz } from '@/api/klient'
-import { formatujDate } from '@/funkcje/format'
-import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Karta } from './Wspolne'
+import { pobierz } from "@/api/klient";
+import { formatujDate, formatujRozmiar } from "@/funkcje/format";
+import { Blad, Ladowanie, Pusto } from "@/komponenty/Stany";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Karta } from "./Wspolne";
 
 interface Dokument {
-  id: number
-  okres_najmu_id: number | null
-  typ: string
-  numer: string | null
-  data_dokumentu: string | null
-  data_obowiazywania_od: string | null
-  plik_nazwa_oryginalna: string | null
-  hash_sha256: string | null
-  rozmiar_bajty: number | null
-  typ_mime: string | null
-  dokument_nadrzedny_id: number | null
-  status_przetworzenia: string
-  utworzono: string
-  uwagi: string | null
-  wersja: number
+  id: number;
+  okres_najmu_id: number | null;
+  typ: string;
+  numer: string | null;
+  data_dokumentu: string | null;
+  data_obowiazywania_od: string | null;
+  plik_nazwa_oryginalna: string | null;
+  hash_sha256: string | null;
+  rozmiar_bajty: number | null;
+  typ_mime: string | null;
+  dokument_nadrzedny_id: number | null;
+  status_przetworzenia: string;
+  utworzono: string;
+  uwagi: string | null;
+  wersja: number;
 }
 
 const TYPY = [
-  { wartosc: 'umowa', etykieta: 'Umowa' },
-  { wartosc: 'aneks', etykieta: 'Aneks' },
-  { wartosc: 'protokol_przekazania', etykieta: 'Protokół przekazania' },
-  { wartosc: 'protokol_zdawczy', etykieta: 'Protokół zdawczy' },
-  { wartosc: 'polisa', etykieta: 'Polisa' },
-  { wartosc: 'protokol_przegladu', etykieta: 'Protokół z przeglądu' },
-  { wartosc: 'wypowiedzenie', etykieta: 'Wypowiedzenie' },
-  { wartosc: 'inne', etykieta: 'Inne' },
-]
+  { wartosc: "umowa", etykieta: "Umowa" },
+  { wartosc: "aneks", etykieta: "Aneks" },
+  { wartosc: "protokol_przekazania", etykieta: "Protokół przekazania" },
+  { wartosc: "protokol_zdawczy", etykieta: "Protokół zdawczy" },
+  { wartosc: "polisa", etykieta: "Polisa" },
+  { wartosc: "protokol_przegladu", etykieta: "Protokół z przeglądu" },
+  { wartosc: "wypowiedzenie", etykieta: "Wypowiedzenie" },
+  { wartosc: "inne", etykieta: "Inne" },
+];
 
-const NAZWY_TYPOW = Object.fromEntries(TYPY.map((t) => [t.wartosc, t.etykieta]))
-
-function rozmiar(bajty: number | null): string {
-  if (bajty === null) return '—'
-  if (bajty < 1024) return `${bajty} B`
-  if (bajty < 1024 * 1024) return `${Math.round(bajty / 1024)} kB`
-  return `${(bajty / 1024 / 1024).toFixed(1)} MB`
-}
+const NAZWY_TYPOW = Object.fromEntries(
+  TYPY.map((t) => [t.wartosc, t.etykieta]),
+);
 
 /**
  * Dokumenty umowy (koncepcja, sekcja 7.2).
@@ -57,15 +52,16 @@ function rozmiar(bajty: number | null): string {
  * dokumentu, a nie o rozsianie kopii po komputerach.
  */
 export function ZakladkaDokumenty({ okresId }: { okresId: number | null }) {
-  const kolejka = useQueryClient()
-  const [wgrywanie, setWgrywanie] = useState(false)
-  const [blad, setBlad] = useState<string | null>(null)
+  const kolejka = useQueryClient();
+  const [wgrywanie, setWgrywanie] = useState(false);
+  const [blad, setBlad] = useState<string | null>(null);
 
   const dokumenty = useQuery({
-    queryKey: ['dokumenty', okresId],
-    queryFn: () => pobierz<Dokument[]>('/dokumenty', { okres_najmu_id: okresId }),
+    queryKey: ["dokumenty", okresId],
+    queryFn: () =>
+      pobierz<Dokument[]>("/dokumenty", { okres_najmu_id: okresId }),
     enabled: okresId != null,
-  })
+  });
 
   if (okresId === null) {
     return (
@@ -73,46 +69,57 @@ export function ZakladkaDokumenty({ okresId }: { okresId: number | null }) {
         tytul="Brak umowy"
         opis="Dokumenty przypina się do umowy. Najpierw załóż umowę dla tego lokalu."
       />
-    )
+    );
   }
-  if (dokumenty.isPending) return <Ladowanie wierszy={3} />
+  if (dokumenty.isPending) return <Ladowanie wierszy={3} />;
   if (dokumenty.isError) {
     return (
       <Blad
-        komunikat={dokumenty.error instanceof Error ? dokumenty.error.message : 'Nieznany błąd.'}
+        komunikat={
+          dokumenty.error instanceof Error
+            ? dokumenty.error.message
+            : "Nieznany błąd."
+        }
         ponow={() => void dokumenty.refetch()}
       />
-    )
+    );
   }
 
   async function wgraj(plik: File, typ: string, nadrzedny: string) {
-    setWgrywanie(true)
-    setBlad(null)
+    setWgrywanie(true);
+    setBlad(null);
     try {
-      const dane = new FormData()
-      dane.append('plik', plik)
-      const zapytanie = new URLSearchParams({ typ, okres_najmu_id: String(okresId) })
-      if (nadrzedny) zapytanie.set('dokument_nadrzedny_id', nadrzedny)
+      const dane = new FormData();
+      dane.append("plik", plik);
+      const zapytanie = new URLSearchParams({
+        typ,
+        okres_najmu_id: String(okresId),
+      });
+      if (nadrzedny) zapytanie.set("dokument_nadrzedny_id", nadrzedny);
 
       const odpowiedz = await fetch(`/api/v1/dokumenty?${zapytanie}`, {
-        method: 'POST',
+        method: "POST",
         body: dane,
-        credentials: 'same-origin',
-      })
-      const tresc = await odpowiedz.json()
+        credentials: "same-origin",
+      });
+      const tresc = await odpowiedz.json();
       if (!odpowiedz.ok) {
-        setBlad(typeof tresc.detail === 'string' ? tresc.detail : 'Nie udało się wgrać pliku.')
-        return
+        setBlad(
+          typeof tresc.detail === "string"
+            ? tresc.detail
+            : "Nie udało się wgrać pliku.",
+        );
+        return;
       }
-      void kolejka.invalidateQueries({ queryKey: ['dokumenty'] })
+      void kolejka.invalidateQueries({ queryKey: ["dokumenty"] });
     } catch {
-      setBlad('Brak połączenia z programem.')
+      setBlad("Brak połączenia z programem.");
     } finally {
-      setWgrywanie(false)
+      setWgrywanie(false);
     }
   }
 
-  const umowy = dokumenty.data.filter((d) => d.typ === 'umowa')
+  const umowy = dokumenty.data.filter((d) => d.typ === "umowa");
 
   return (
     <div className="space-y-4">
@@ -154,18 +161,28 @@ export function ZakladkaDokumenty({ okresId }: { okresId: number | null }) {
                 {dokumenty.data.map((d) => (
                   <tr key={d.id} className="border-b last:border-b-0">
                     <td className="px-3 py-2.5">
-                      <Badge variant={d.typ === 'umowa' ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={d.typ === "umowa" ? "default" : "secondary"}
+                      >
                         {NAZWY_TYPOW[d.typ] ?? d.typ}
                       </Badge>
-                      {d.numer && <span className="ml-2 text-xs">nr {d.numer}</span>}
+                      {d.numer && (
+                        <span className="ml-2 text-xs">nr {d.numer}</span>
+                      )}
                     </td>
-                    <td className="px-3 py-2.5">{d.plik_nazwa_oryginalna ?? '—'}</td>
-                    <td className="px-3 py-2.5">{formatujDate(d.data_dokumentu)}</td>
+                    <td className="px-3 py-2.5">
+                      {d.plik_nazwa_oryginalna ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {formatujDate(d.data_dokumentu)}
+                    </td>
                     <td className="px-3 py-2.5 text-muted-foreground">
-                      {d.dokument_nadrzedny_id ? `aneks do #${d.dokument_nadrzedny_id}` : '—'}
+                      {d.dokument_nadrzedny_id
+                        ? `aneks do #${d.dokument_nadrzedny_id}`
+                        : "—"}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                      {rozmiar(d.rozmiar_bajty)}
+                      {formatujRozmiar(d.rozmiar_bajty)}
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <a
@@ -185,7 +202,7 @@ export function ZakladkaDokumenty({ okresId }: { okresId: number | null }) {
         </Karta>
       )}
     </div>
-  )
+  );
 }
 
 function FormularzWgrywania({
@@ -193,20 +210,20 @@ function FormularzWgrywania({
   wgrywanie,
   onWgraj,
 }: {
-  umowy: Dokument[]
-  wgrywanie: boolean
-  onWgraj: (plik: File, typ: string, nadrzedny: string) => void
+  umowy: Dokument[];
+  wgrywanie: boolean;
+  onWgraj: (plik: File, typ: string, nadrzedny: string) => void;
 }) {
-  const [plik, setPlik] = useState<File | null>(null)
-  const [typ, setTyp] = useState('umowa')
-  const [nadrzedny, setNadrzedny] = useState('')
+  const [plik, setPlik] = useState<File | null>(null);
+  const [typ, setTyp] = useState("umowa");
+  const [nadrzedny, setNadrzedny] = useState("");
 
   return (
     <form
       className="flex flex-wrap items-end gap-3 rounded-lg border bg-background p-4"
       onSubmit={(e) => {
-        e.preventDefault()
-        if (plik) onWgraj(plik, typ, typ === 'aneks' ? nadrzedny : '')
+        e.preventDefault();
+        if (plik) onWgraj(plik, typ, typ === "aneks" ? nadrzedny : "");
       }}
     >
       <div className="min-w-64 flex-1 space-y-1.5">
@@ -236,7 +253,7 @@ function FormularzWgrywania({
         </select>
       </div>
 
-      {typ === 'aneks' && (
+      {typ === "aneks" && (
         <div className="space-y-1.5">
           <Label htmlFor="nadrzedny">Aneks do umowy</Label>
           <select
@@ -256,8 +273,8 @@ function FormularzWgrywania({
       )}
 
       <Button type="submit" disabled={!plik || wgrywanie}>
-        {wgrywanie ? 'Wgrywam…' : 'Wgraj'}
+        {wgrywanie ? "Wgrywam…" : "Wgraj"}
       </Button>
     </form>
-  )
+  );
 }

@@ -21,7 +21,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.exc import IntegrityError
 
-from najem.auth.zaleznosci import Podglad, Zarzadca
 from najem.baza import SesjaBazy
 from najem.domena.slowniki import OperacjaAudytu, RodzajWskaznika
 from najem.modele import WskaznikWaloryzacji
@@ -125,7 +124,6 @@ def _adres(request: Request) -> str | None:
 @router.get("/wskazniki", response_model=Strona[WskaznikWyjscie], summary="Wprowadzone wskaźniki")
 def lista_wskaznikow(
     baza: SesjaBazy,
-    _: Podglad,
     limit: Limit = LIMIT_DOMYSLNY,
     offset: Offset = 0,
     rok: Annotated[int | None, Query(ge=2000, le=2200)] = None,
@@ -159,9 +157,7 @@ def lista_wskaznikow(
     status_code=status.HTTP_201_CREATED,
     summary="Wprowadza wskaźnik na dany rok",
 )
-def dodaj_wskaznik(
-    dane: WskaznikWejscie, baza: SesjaBazy, kto: Zarzadca, request: Request
-) -> WskaznikWyjscie:
+def dodaj_wskaznik(dane: WskaznikWejscie, baza: SesjaBazy, request: Request) -> WskaznikWyjscie:
     """Wskaźnik wprowadza się raz. Powtórne wprowadzenie tego samego rodzaju
     na ten sam rok jest błędem, a nie cichą podmianą — GUS nie publikuje
     wskaźnika dwa razy.
@@ -179,7 +175,7 @@ def dodaj_wskaznik(
             f"({istniejacy.wartosc_procent}%).",
         )
 
-    wskaznik = WskaznikWaloryzacji(**dane.model_dump(), wprowadzil_uzytkownik_id=kto.uzytkownik.id)
+    wskaznik = WskaznikWaloryzacji(**dane.model_dump())
     baza.add(wskaznik)
     try:
         baza.flush()
@@ -196,7 +192,6 @@ def dodaj_wskaznik(
         baza,
         wskaznik,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -244,7 +239,6 @@ def _na_wyjscie(pozycja: PozycjaWaloryzacji) -> PozycjaWyjscie:
 )
 def przebieg(
     baza: SesjaBazy,
-    _: Podglad,
     rok: Annotated[int, Query(ge=2000, le=2200)],
 ) -> PrzebiegWyjscie:
     """Przebieg **nie jest stronicowany** i to jest decyzja, nie przeoczenie.
@@ -279,7 +273,7 @@ def _suma_na_wyjscie(suma: SumaWaluty) -> SumaWyjscie:
     response_model=list[SumaWyjscie],
     summary="Suma zaznaczonych propozycji (podgląd przed zatwierdzeniem)",
 )
-def podsumowanie(dane: PodsumowanieWejscie, baza: SesjaBazy, _: Podglad) -> list[SumaWyjscie]:
+def podsumowanie(dane: PodsumowanieWejscie, baza: SesjaBazy) -> list[SumaWyjscie]:
     """Sumę liczy serwer, bo tylko on ma Decimal. Przeglądarka umie tylko float,
     a float na pieniądzach to zasada, której w tym projekcie nie łamiemy.
     """
@@ -293,14 +287,13 @@ def podsumowanie(dane: PodsumowanieWejscie, baza: SesjaBazy, _: Podglad) -> list
     summary="Krok 2: zapisuje wybrane propozycje w jednej transakcji",
 )
 def zatwierdz_przebieg(
-    dane: ZatwierdzenieWejscie, baza: SesjaBazy, kto: Zarzadca, request: Request
+    dane: ZatwierdzenieWejscie, baza: SesjaBazy, request: Request
 ) -> ZatwierdzenieWyjscie:
     try:
         wynik = zatwierdz(
             baza,
             dane.rok,
             set(dane.okresy_najmu),
-            uzytkownik_id=kto.uzytkownik.id,
             adres_ip=_adres(request),
         )
     except BladWaloryzacji as blad:
@@ -388,7 +381,6 @@ def _wypelnij(arkusz: Worksheet, pozycje: Iterable[PozycjaWaloryzacji]) -> None:
 )
 def eksport(
     baza: SesjaBazy,
-    _: Podglad,
     rok: Annotated[int, Query(ge=2000, le=2200)],
 ) -> Response:
     """Arkusz z listą zmian. Służy do przygotowania pism do najemców,

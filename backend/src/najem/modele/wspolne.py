@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Any
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Numeric, String, func
+from sqlalchemy import BigInteger, DateTime, Enum, Numeric, String, func
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 
@@ -71,12 +71,6 @@ class MiekkieUsuwanie:
     usunieto_dnia: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
-
-    @declared_attr
-    def usunal_uzytkownik_id(cls) -> Mapped[int | None]:  # noqa: N805
-        return mapped_column(
-            BigInteger, ForeignKey("uzytkownik.id", ondelete="RESTRICT"), nullable=True
-        )
 
     @property
     def czy_usuniety(self) -> bool:

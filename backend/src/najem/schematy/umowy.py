@@ -162,7 +162,6 @@ class ParametrWyjscie(Odczyt):
     zrodlo_strona: int | None
     zrodlo_paragraf: str | None
     status_weryfikacji: StatusWeryfikacji
-    zatwierdzil_uzytkownik_id: int | None
     zatwierdzono_dnia: datetime | None
     uwagi: str | None
     wersja: int
