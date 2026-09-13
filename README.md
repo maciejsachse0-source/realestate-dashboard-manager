@@ -12,9 +12,9 @@ i bez żadnych usług zewnętrznych.
 
 ## Stan: etapy E0 – E8 ukończone
 
-Program działa od kliknięcia skrótu po dane. Można się zalogować, przeglądać
-lokale, filtrować je, wejść w profil lokalu i zobaczyć stan umowy na dowolny
-dzień wstecz oraz listę terminów wymagających uwagi.
+Program działa od kliknięcia skrótu po dane. Otwiera się od razu na liście
+lokali: można je filtrować, wejść w profil lokalu i zobaczyć stan umowy na
+dowolny dzień wstecz oraz listę terminów wymagających uwagi.
 
 Waloryzacja roczna: wskaźnik wprowadza się **raz**, a system liczy propozycję
 dla każdej umowy, która mu podlega, pokazuje wyłączenia z powodem i zapisuje
@@ -23,14 +23,14 @@ godzin raz do roku.
 
 | Warstwa | Stan |
 |---|---|
-| Baza | 14 tabel, 17 ograniczeń CHECK, 4 migracje |
+| Baza | 16 tabel, 17 ograniczeń CHECK, 7 migracji |
 | Reguły biznesowe | R1, R2, R4–R7, R9 — pokrycie testami 100% |
-| API | 52 endpointy, cztery role, audyt każdej zmiany |
+| API | 56 endpointów, bez logowania i ról, audyt każdej zmiany |
 | Generator zdarzeń | codziennie o 6:00, idempotentny |
-| Interfejs | logowanie, dashboard, kartoteka, kokpit terminów, profil lokalu, import, waloryzacja |
+| Interfejs | dashboard, kartoteka, kokpit terminów, profil lokalu, dokumenty z dysku, import, waloryzacja |
 | Dokumenty | typ rozpoznawany po zawartości, deduplikacja, hierarchia aneksów |
 
-Kontrola: 464 testy backendu, 25 frontendu, `mypy` strict i `ruff` czysto.
+Kontrola: 630 testów backendu, 56 frontendu, `mypy` strict i `ruff` czysto.
 
 **Od tego miejsca system zastępuje Excela.** Czego jeszcze nie ma: ekstrakcji
 danych z umów (OCR), podglądu PDF w aplikacji, edycji i usuwania rekordów
@@ -50,9 +50,9 @@ klikając **`Zatrzymaj system.cmd`**.
 Pierwsze uruchomienie pobiera bazę danych (około 350 MB) i trwa kilka minut.
 Kolejne startują w kilka sekund.
 
-**Przy pierwszym starcie** program zakłada konto `administrator` i pokazuje
-losowe hasło **raz**, w oknie startowym. Zapisz je — komunikat nie wróci.
-Program poprosi o zmianę hasła przy pierwszym logowaniu.
+**Program nie ma logowania.** Otwiera się od razu na liście lokali. Dostępu
+pilnuje dostęp do komputera — powód i konsekwencje opisuje
+[ADR 009](docs/decyzje/009-usuniecie-logowania.md).
 
 Adres to `127.0.0.1:8010`, a nie `localhost:8010`. Skrót otwiera go poprawnie;
 wpisanie `localhost` ręcznie może nie zadziałać (szczegóły w `docs/pulapki.md`).
@@ -73,6 +73,49 @@ Na komputerze muszą być dwa programy. Reszta pobiera się sama.
 | **Node.js 20+** | buduje interfejs | https://nodejs.org/ |
 
 Potem wystarczy pobrać ten katalog i kliknąć `Uruchom system najmu.cmd`.
+
+To jest instalacja **dla autora**. Osoba, która ma tylko używać programu,
+dostaje paczkę wydania i nie potrzebuje ani Node.js, ani repozytorium.
+
+## Instalacja u użytkownika
+
+Program działa na jej komputerze, dane i dokumenty zostają u niej, a poprawki
+wysyła się mailem jako plik. Szczegóły i odrzucone warianty:
+[ADR 010](docs/decyzje/010-instalacja-u-uzytkownika-i-kanal-aktualizacji.md).
+
+### Raz, przy zakładaniu
+
+```powershell
+powershell -File narzedzia\spakuj-wydanie.ps1 -Pelna    # ~310 MB, z bazą w środku
+```
+
+Paczkę rozpakowuje się na jej komputerze do `C:\SystemNajmu` i klika
+`Zainstaluj.cmd`. Instalator zakłada katalog na dane, konfigurację, bazę, skrót
+na pulpicie i codzienną kopię zapasową. Pyta o jedną rzecz: **dokąd mają trafiać
+kopie zapasowe**.
+
+Jedyne, co trzeba doinstalować osobno, to [uv](https://docs.astral.sh/uv/).
+Instalacja wymaga internetu (uv pobiera Pythona i biblioteki); codzienna praca
+programu już nie.
+
+### Przy każdej poprawce
+
+```powershell
+powershell -File narzedzia\spakuj-wydanie.ps1           # kilka MB, do maila
+```
+
+Ona przeciąga przysłany plik na `Aktualizuj.cmd`. Aktualizator sprawdza paczkę,
+robi zrzut bazy, podmienia program i uruchamia migracje. Gdy coś pójdzie nie tak,
+sam wraca do poprzedniej wersji. `Cofnij aktualizacje.cmd` robi to samo na
+żądanie.
+
+**Ustawienia i dane przeżywają aktualizację** — katalog skanu, sparowane foldery
+i cała zawartość bazy leżą poza katalogiem programu i aktualizator ich nie dotyka.
+
+### Kiedy coś nie działa
+
+`Diagnostyka.cmd` składa na pulpicie plik z wersją, stanem bazy i logami —
+bez nazw najemców, kwot i treści dokumentów. Ona wysyła go mailem.
 
 ## Praca deweloperska
 
@@ -111,8 +154,32 @@ nigdy nie trafia do repozytorium.
 
 ## Kopia zapasowa
 
-Do zrobienia w etapie E12. Kopiowane muszą być dwie rzeczy: baza (`pg_dump`)
-i katalog `dane/dokumenty/`. Kopia, której nikt nie odtworzył, nie istnieje.
+```powershell
+powershell -File narzedzia\kopia-zapasowa.ps1        # ręcznie, tu i teraz
+powershell -File narzedzia\zaplanuj-kopie.ps1        # codziennie o 12:30
+```
+
+Kopiowane są **trzy** rzeczy, nie dwie: zrzut bazy (`pg_dump -F c`), katalog
+`dane/dokumenty/` i katalog z dokumentami na dysku użytkownika. Ten trzeci jest
+konieczny, bo dokumenty wskazane na dysku nie są kopiowane do programu, tylko
+linkowane ([ADR 008](docs/decyzje/008-dokumenty-linkowane-nie-kopiowane.md)) —
+sama kopia bazy zostawiłaby ścieżki do plików, których już nie ma.
+
+Cel wskazuje `KATALOG_KOPII` w `.env`. Pusty = skrypt kończy się **błędem**,
+a nie ciszą: kopia, o której nikt nie wie, że się nie robi, jest gorsza niż jej
+brak. Instalacja u użytkownika pyta o ten katalog i zakłada zadanie w
+Harmonogramie Windows.
+
+**Bez chmury nie ma drugiego miejsca, w którym awarię widać.** Zadanie chodzi
+w ukrytym oknie, więc wyjęty pendrive albo zmieniona litera dysku zatrzymałyby
+kopie po cichu. Dlatego każda próba zapisuje wynik do `dane/stan-kopii.txt`
+(lokalnie, bo to jedyne miejsce zapisywalne, gdy dysku kopii nie ma),
+a `uruchom.ps1` przy starcie programu mówi wprost, jeśli ostatnia kopia się nie
+udała albo była dawniej niż trzy dni temu. Start programu to jedyny moment,
+w którym użytkownik na pewno patrzy na ekran.
+
+Kopia, której nikt nie odtworzył, nie istnieje — zrzut sprawdza się przez
+`pg_restore --list nazwa.dump`.
 
 ## Struktura
 
@@ -127,9 +194,11 @@ backend/          FastAPI, SQLAlchemy 2.0, Alembic
     api/v1/       endpointy
   tests/domena/   tu jest najwięcej testów i tak ma zostać
 frontend/         Vite, React, TypeScript, Tailwind, TanStack
-narzedzia/        skrypty uruchomieniowe i hooki
+narzedzia/        skrypty uruchomieniowe, pakowanie wydań, kopia zapasowa
+instalator/       zakładanie i aktualizacja instalacji u użytkownika
 docs/             koncepcja, plan, decyzje, stan prac
 tools/, pgdata/   binaria i dane PostgreSQL (poza repozytorium)
+wydania/          złożone paczki (poza repozytorium)
 ```
 
 Najważniejsza granica w tej strukturze: `domena/` nie importuje SQLAlchemy,

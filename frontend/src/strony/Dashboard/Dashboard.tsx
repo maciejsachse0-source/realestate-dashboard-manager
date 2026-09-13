@@ -1,20 +1,25 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { flexRender } from '@tanstack/react-table'
+import { Fragment, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { flexRender } from "@tanstack/react-table";
 // Wejscie `legacy` to wspierany interfejs v8 dostarczany wewnatrz v9.
 // Uzasadnienie i sciezka migracji: docs/decyzje/006-tanstack-table-legacy.md
 import {
   getCoreRowModel,
   useLegacyTable,
   type LegacyColumnDef,
-} from '@tanstack/react-table/legacy'
+} from "@tanstack/react-table/legacy";
 
-import { useBudynki, useLokale } from '@/api/zapytania'
-import type { FiltryLokali, LokalNaLiscie } from '@/api/typy'
-import { BRAK_DANYCH, formatujDate, formatujKwote, formatujPowierzchnie } from '@/funkcje/format'
-import { Blad, Ladowanie, Pusto } from '@/komponenty/Stany'
-import { PasekKompletnosci } from '@/komponenty/PasekKompletnosci'
-import { PanelFiltrow } from './PanelFiltrow'
+import { useBudynki, useLokale } from "@/api/zapytania";
+import type { Budynek, FiltryLokali, LokalNaLiscie } from "@/api/typy";
+import {
+  BRAK_DANYCH,
+  formatujDate,
+  formatujKwote,
+  formatujPowierzchnie,
+} from "@/funkcje/format";
+import { Blad, Ladowanie, Pusto } from "@/komponenty/Stany";
+import { PasekKompletnosci } from "@/komponenty/PasekKompletnosci";
+import { PanelFiltrow } from "./PanelFiltrow";
 import {
   Table,
   TableBody,
@@ -22,21 +27,21 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
-const NA_STRONIE = 50
+const NA_STRONIE = 50;
 
 /** Etykiety statusów. Enum z API jest techniczny, użytkownik czyta polski tekst. */
 const ETYKIETY_STATUSU: Record<string, string> = {
-  wolny: 'Wolny',
-  wynajety: 'Wynajęty',
-  w_trakcie_wydania: 'W trakcie wydania',
-  przygotowanie: 'W przygotowaniu',
-  aktywna: 'Aktywna',
-  wypowiedziana: 'Wypowiedziana',
-  zakonczona: 'Zakończona',
-}
+  wolny: "Wolny",
+  wynajety: "Wynajęty",
+  w_trakcie_wydania: "W trakcie wydania",
+  przygotowanie: "W przygotowaniu",
+  aktywna: "Aktywna",
+  wypowiedziana: "Wypowiedziana",
+  zakonczona: "Zakończona",
+};
 
 /**
  * Dashboard: lista lokali (koncepcja, sekcja 7.1).
@@ -45,51 +50,64 @@ const ETYKIETY_STATUSU: Record<string, string> = {
  * a dane umowy są jego bieżącym stanem.
  */
 export default function Dashboard() {
-  const nawigacja = useNavigate()
-  const [filtry, setFiltry] = useState<FiltryLokali>({ limit: NA_STRONIE, offset: 0 })
-  const budynki = useBudynki()
-  const lokale = useLokale(filtry)
+  const nawigacja = useNavigate();
+  // Domyslnie sortujemy budynkami, bo tabela jest nimi pogrupowana.
+  // Inna kolumna wymieszalaby budynki i sekcje przestalyby cokolwiek znaczyc.
+  const [filtry, setFiltry] = useState<FiltryLokali>({
+    limit: NA_STRONIE,
+    offset: 0,
+    sortuj: "budynek",
+  });
+  const budynki = useBudynki();
+  const lokale = useLokale(filtry);
 
   const nazwyBudynkow = useMemo(
-    () => budynki.data?.pozycje.map((b) => ({ id: b.id, nazwa: b.nazwa })) ?? [],
+    () =>
+      budynki.data?.pozycje.map((b) => ({ id: b.id, nazwa: b.nazwa })) ?? [],
     [budynki.data],
-  )
+  );
+
+  // Naglowek sekcji pokazuje wiecej niz sama nazwa z wiersza lokalu: adres
+  // i to, czy budynek jest jeszcze czynny.
+  const budynkiWedlugId = useMemo(
+    () => new Map<number, Budynek>(budynki.data?.pozycje.map((b) => [b.id, b])),
+    [budynki.data],
+  );
 
   const kolumny = useMemo<LegacyColumnDef<LokalNaLiscie>[]>(
     () => [
       {
-        accessorKey: 'oznaczenie',
-        header: 'Lokal',
+        accessorKey: "oznaczenie",
+        header: "Lokal",
+        // Bez podpisu z nazwa budynku: mowi ja naglowek sekcji nad wierszem.
         cell: ({ row }) => (
-          <div>
-            <div className="font-medium">{row.original.oznaczenie}</div>
-            <div className="text-xs text-muted-foreground">{row.original.budynek_nazwa}</div>
-          </div>
+          <div className="font-medium">{row.original.oznaczenie}</div>
         ),
       },
       {
-        accessorKey: 'najemca_nazwa',
-        header: 'Najemca',
+        accessorKey: "najemca_nazwa",
+        header: "Najemca",
         cell: ({ row }) =>
           row.original.najemca_nazwa ?? (
             <span className="text-muted-foreground">{BRAK_DANYCH}</span>
           ),
       },
       {
-        accessorKey: 'status_umowy',
-        header: 'Umowa',
+        accessorKey: "status_umowy",
+        header: "Umowa",
         cell: ({ row }) => {
-          const status = row.original.status_umowy
-          if (!status) return <span className="text-muted-foreground">brak umowy</span>
+          const status = row.original.status_umowy;
+          if (!status)
+            return <span className="text-muted-foreground">brak umowy</span>;
           return (
-            <Badge variant={status === 'aktywna' ? 'default' : 'secondary'}>
+            <Badge variant={status === "aktywna" ? "default" : "secondary"}>
               {ETYKIETY_STATUSU[status] ?? status}
             </Badge>
-          )
+          );
         },
       },
       {
-        accessorKey: 'powierzchnia_ewidencyjna',
+        accessorKey: "powierzchnia_ewidencyjna",
         header: () => <div className="text-right">Powierzchnia</div>,
         cell: ({ row }) => (
           <div className="text-right tabular-nums">
@@ -100,29 +118,36 @@ export default function Dashboard() {
         ),
       },
       {
-        accessorKey: 'czynsz',
+        accessorKey: "czynsz",
         header: () => <div className="text-right">Czynsz</div>,
         cell: ({ row }) => {
-          const { czynsz, czynsz_waluta, czynsz_rodzaj } = row.original
+          const { czynsz, czynsz_waluta, czynsz_rodzaj } = row.original;
           if (!czynsz) {
-            return <div className="text-right text-muted-foreground">{BRAK_DANYCH}</div>
+            return (
+              <div className="text-right text-muted-foreground">
+                {BRAK_DANYCH}
+              </div>
+            );
           }
           return (
             <div className="text-right tabular-nums">
-              {formatujKwote(czynsz, czynsz_waluta ?? 'PLN')}
-              <span className="ml-1 text-xs text-muted-foreground">{czynsz_rodzaj}</span>
+              {formatujKwote(czynsz, czynsz_waluta ?? "PLN")}
+              <span className="ml-1 text-xs text-muted-foreground">
+                {czynsz_rodzaj}
+              </span>
             </div>
-          )
+          );
         },
       },
       {
-        accessorKey: 'data_zakonczenia',
-        header: 'Koniec umowy',
+        accessorKey: "data_zakonczenia",
+        header: "Koniec umowy",
         cell: ({ row }) => {
-          const { data_zakonczenia, powod_braku_daty_zakonczenia } = row.original
-          if (data_zakonczenia) return formatujDate(data_zakonczenia)
+          const { data_zakonczenia, powod_braku_daty_zakonczenia } =
+            row.original;
+          if (data_zakonczenia) return formatujDate(data_zakonczenia);
           if (!powod_braku_daty_zakonczenia) {
-            return <span className="text-muted-foreground">{BRAK_DANYCH}</span>
+            return <span className="text-muted-foreground">{BRAK_DANYCH}</span>;
           }
           // Decyzja D5: brak danych to informacja z powodem, nie pusta komórka.
           return (
@@ -132,12 +157,12 @@ export default function Dashboard() {
             >
               nieustalona
             </span>
-          )
+          );
         },
       },
       {
-        accessorKey: 'kompletnosc_procent',
-        header: 'Kompletność',
+        accessorKey: "kompletnosc_procent",
+        header: "Kompletność",
         cell: ({ row }) => (
           <PasekKompletnosci
             procent={row.original.kompletnosc_procent}
@@ -146,10 +171,10 @@ export default function Dashboard() {
         ),
       },
       {
-        accessorKey: 'zdarzen_otwartych',
+        accessorKey: "zdarzen_otwartych",
         header: () => <div className="text-right">Alerty</div>,
         cell: ({ row }) => {
-          const ile = row.original.zdarzen_otwartych
+          const ile = row.original.zdarzen_otwartych;
           return (
             <div className="text-right">
               {ile > 0 ? (
@@ -158,21 +183,31 @@ export default function Dashboard() {
                 <span className="text-muted-foreground">—</span>
               )}
             </div>
-          )
+          );
         },
       },
     ],
     [],
-  )
+  );
 
   const tabela = useLegacyTable({
     data: lokale.data?.pozycje ?? [],
     columns: kolumny,
     getCoreRowModel: getCoreRowModel(),
-  })
+  });
 
-  const wszystkich = lokale.data?.wszystkich ?? 0
-  const offset = filtry.offset ?? 0
+  const wszystkich = lokale.data?.wszystkich ?? 0;
+  const offset = filtry.offset ?? 0;
+  const stronicowane = wszystkich > NA_STRONIE;
+  const wiersze = tabela.getRowModel().rows;
+
+  // Licznik dotyczy tego, co widac na stronie. Przy stronicowaniu budynek
+  // potrafi sie rozjechac na dwie strony, dlatego naglowek to wtedy pisze.
+  const lokaliWBudynku = new Map<number, number>();
+  for (const wiersz of wiersze) {
+    const id = wiersz.original.budynek_id;
+    lokaliWBudynku.set(id, (lokaliWBudynku.get(id) ?? 0) + 1);
+  }
 
   return (
     <div className="space-y-4">
@@ -181,20 +216,26 @@ export default function Dashboard() {
         {lokale.data && (
           <p className="text-sm text-muted-foreground">
             {wszystkich === 0
-              ? 'Brak wyników'
+              ? "Brak wyników"
               : `${offset + 1}–${Math.min(offset + NA_STRONIE, wszystkich)} z ${wszystkich}`}
           </p>
         )}
       </div>
 
-      <PanelFiltrow filtry={filtry} budynki={nazwyBudynkow} onZmiana={setFiltry} />
+      <PanelFiltrow
+        filtry={filtry}
+        budynki={nazwyBudynkow}
+        onZmiana={setFiltry}
+      />
 
       {lokale.isPending && <Ladowanie />}
 
       {lokale.isError && (
         <Blad
           komunikat={
-            lokale.error instanceof Error ? lokale.error.message : 'Nieznany błąd połączenia.'
+            lokale.error instanceof Error
+              ? lokale.error.message
+              : "Nieznany błąd połączenia."
           }
           ponow={() => void lokale.refetch()}
         />
@@ -205,8 +246,8 @@ export default function Dashboard() {
           tytul="Nie ma lokali pasujących do filtrów"
           opis={
             Object.keys(filtry).length > 2
-              ? 'Wyczyść filtry albo zmień zakres wyszukiwania.'
-              : 'Dodaj pierwszy budynek i lokal, żeby zacząć prowadzić rejestr.'
+              ? "Wyczyść filtry albo zmień zakres wyszukiwania."
+              : "Dodaj pierwszy budynek i lokal, żeby zacząć prowadzić rejestr."
           }
         />
       )}
@@ -230,27 +271,47 @@ export default function Dashboard() {
                 ))}
               </TableHeader>
               <TableBody>
-                {tabela.getRowModel().rows.map((wiersz) => (
-                  <TableRow
-                    key={wiersz.id}
-                    tabIndex={0}
-                    role="link"
-                    className="cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
-                    onClick={() => nawigacja(`/lokale/${wiersz.original.lokal_id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        nawigacja(`/lokale/${wiersz.original.lokal_id}`)
-                      }
-                    }}
-                  >
-                    {wiersz.getVisibleCells().map((komorka) => (
-                      <TableCell key={komorka.id}>
-                        {flexRender(komorka.column.columnDef.cell, komorka.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
+                {wiersze.map((wiersz, indeks) => {
+                  const lokal = wiersz.original;
+                  const poprzedni = wiersze[indeks - 1]?.original;
+                  const nowaSekcja =
+                    poprzedni === undefined ||
+                    poprzedni.budynek_id !== lokal.budynek_id;
+                  return (
+                    <Fragment key={wiersz.id}>
+                      {nowaSekcja && (
+                        <NaglowekBudynku
+                          budynek={budynkiWedlugId.get(lokal.budynek_id)}
+                          nazwaZapasowa={lokal.budynek_nazwa}
+                          lokali={lokaliWBudynku.get(lokal.budynek_id) ?? 0}
+                          czesciowo={stronicowane}
+                          kolumn={kolumny.length}
+                        />
+                      )}
+                      <TableRow
+                        tabIndex={0}
+                        role="link"
+                        className="cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                        onClick={() => nawigacja(`/lokale/${lokal.lokal_id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            nawigacja(`/lokale/${lokal.lokal_id}`);
+                          }
+                        }}
+                      >
+                        {wiersz.getVisibleCells().map((komorka) => (
+                          <TableCell key={komorka.id}>
+                            {flexRender(
+                              komorka.column.columnDef.cell,
+                              komorka.getContext(),
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -261,7 +322,12 @@ export default function Dashboard() {
                 type="button"
                 className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-40"
                 disabled={offset === 0}
-                onClick={() => setFiltry({ ...filtry, offset: Math.max(0, offset - NA_STRONIE) })}
+                onClick={() =>
+                  setFiltry({
+                    ...filtry,
+                    offset: Math.max(0, offset - NA_STRONIE),
+                  })
+                }
               >
                 Poprzednie
               </button>
@@ -269,7 +335,9 @@ export default function Dashboard() {
                 type="button"
                 className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-40"
                 disabled={offset + NA_STRONIE >= wszystkich}
-                onClick={() => setFiltry({ ...filtry, offset: offset + NA_STRONIE })}
+                onClick={() =>
+                  setFiltry({ ...filtry, offset: offset + NA_STRONIE })
+                }
               >
                 Następne
               </button>
@@ -278,5 +346,51 @@ export default function Dashboard() {
         </>
       )}
     </div>
-  )
+  );
+}
+
+/**
+ * Nagłówek sekcji budynku w tabeli lokali.
+ *
+ * Ten sam pomysł co w kartotece: budynek jest podziałem tabeli, nie kolumną.
+ * Musi być widoczny na pierwszy rzut oka, bo przy przewijaniu długiej listy
+ * to jedyne miejsce, gdzie oko może się zaczepić.
+ */
+function NaglowekBudynku({
+  budynek,
+  nazwaZapasowa,
+  lokali,
+  czesciowo,
+  kolumn,
+}: {
+  budynek: Budynek | undefined;
+  nazwaZapasowa: string;
+  lokali: number;
+  czesciowo: boolean;
+  kolumn: number;
+}) {
+  return (
+    <TableRow className="border-y-2 border-border bg-foreground/[0.06] hover:bg-foreground/[0.06]">
+      <TableCell colSpan={kolumn} className="py-3">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-l-4 border-foreground/40 pl-3">
+          <span className="text-sm font-bold tracking-wider uppercase">
+            {budynek?.nazwa ?? nazwaZapasowa}
+          </span>
+          {budynek?.adres && (
+            <span className="text-xs text-muted-foreground">
+              {budynek.adres}
+            </span>
+          )}
+          <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+            {czesciowo ? `na tej stronie: ${lokali}` : `lokali: ${lokali}`}
+          </span>
+          {budynek && !budynek.aktywny && (
+            <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+              nieaktywny
+            </span>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }

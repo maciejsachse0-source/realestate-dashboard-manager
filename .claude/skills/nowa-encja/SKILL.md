@@ -13,7 +13,9 @@ Dodaj encję: $ARGUMENTS
    (`Mapped`, `mapped_column`). Obowiązkowo:
    - kwoty jako `Numeric(12, 2)`, nigdy `Float`,
    - daty biznesowe `Date`, znaczniki techniczne `DateTime(timezone=True)`,
-   - `usunieto_dnia` i `usunal_uzytkownik_id` — soft delete,
+   - `usunieto_dnia` — soft delete (miksin `MiekkieUsuwanie`; kolumny
+     z autorem nie ma, program nie ma użytkowników —
+     [ADR 009](../../../docs/decyzje/009-usuniecie-logowania.md)),
    - `wersja` jako `mapped_column(..., nullable=False, default=1)`
      plus `__mapper_args__ = {"version_id_col": wersja}` — optimistic locking,
    - `utworzono` i `zmodyfikowano` w UTC.

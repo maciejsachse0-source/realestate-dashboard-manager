@@ -10,11 +10,13 @@ from najem.modele.najem import (
     Zabezpieczenie,
 )
 from najem.modele.organizacja import Budynek, Lokal
-from najem.modele.podmioty import Najemca, OsobaKontaktowa, Uzytkownik
-from najem.modele.sesje import SesjaUzytkownika
+from najem.modele.podmioty import Najemca, OsobaKontaktowa
+from najem.modele.skan import PominietyPlik, PowiazanieFolderu
+from najem.modele.ustawienia import KLUCZ_KATALOG_SKANU, UstawienieSystemu
 from najem.modele.zdarzenia import LogAudytu, WskaznikWaloryzacji, Zdarzenie
 
 __all__ = [
+    "KLUCZ_KATALOG_SKANU",
     "Budynek",
     "Dokument",
     "LogAudytu",
@@ -24,9 +26,10 @@ __all__ = [
     "OkresNajmu",
     "OsobaKontaktowa",
     "ParametrWartosc",
-    "SesjaUzytkownika",
+    "PominietyPlik",
+    "PowiazanieFolderu",
     "SkladnikOplaty",
-    "Uzytkownik",
+    "UstawienieSystemu",
     "WskaznikWaloryzacji",
     "Zabezpieczenie",
     "Zdarzenie",

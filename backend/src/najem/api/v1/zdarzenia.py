@@ -14,8 +14,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, case, func, or_, select
 
-from najem.auth.zaleznosci import Operator, Podglad
 from najem.baza import SesjaBazy
+from najem.domena.kalendarz import dni_do
 from najem.domena.slowniki import (
     OperacjaAudytu,
     StatusZdarzenia,
@@ -23,17 +23,30 @@ from najem.domena.slowniki import (
     WagaZdarzenia,
 )
 from najem.domena.stany import PRZEJSCIA_ZDARZENIA, sprawdz_przejscie
-from najem.modele import Lokal, Uzytkownik, Zdarzenie
+from najem.modele import Lokal, Zdarzenie
 from najem.schematy.kartoteka import (
     ObslugaZdarzenia,
     OdroczenieZdarzenia,
-    PrzypisanieZdarzenia,
     ZdarzenieWyjscie,
 )
 from najem.schematy.wspolne import LIMIT_DOMYSLNY, LIMIT_MAKSYMALNY, Strona
 from najem.uslugi.audyt import zapisz_zmiane
 from najem.uslugi.generator_zdarzen import uruchom_generator
 from najem.zadania.harmonogram import dzis_lokalnie
+
+
+def na_wyjscie(zdarzenie: Zdarzenie) -> ZdarzenieWyjscie:
+    """Zdarzenie z policzona liczba dni do terminu.
+
+    Liczymy tutaj, a nie w przegladarce, bo wyliczenia naleza do API
+    (CLAUDE.md, zasady architektury). Dzien odniesienia bierzemy w strefie
+    prezentacji: o drugiej w nocy UTC pokazuje jeszcze dzien poprzedni,
+    a "zostaly 3 dni" musi znaczyc trzy polskie dni.
+    """
+    wyjscie = ZdarzenieWyjscie.model_validate(zdarzenie)
+    wyjscie.dni_do_terminu = dni_do(zdarzenie.data_zdarzenia, dzis_lokalnie())
+    return wyjscie
+
 
 #: Krytyczne na gorze, potem ostrzezenia, na koncu informacje.
 KOLEJNOSC_WAGI = case(
@@ -79,7 +92,6 @@ def generuj(
 @router.get("", response_model=Strona[ZdarzenieWyjscie], summary="Kokpit terminów")
 def lista_zdarzen(
     sesja: SesjaBazy,
-    _: Podglad,
     limit: Annotated[int, Query(ge=1, le=LIMIT_MAKSYMALNY)] = LIMIT_DOMYSLNY,
     offset: Annotated[int, Query(ge=0)] = 0,
     status_zdarzenia: StatusZdarzenia | None = StatusZdarzenia.OTWARTE,
@@ -87,7 +99,6 @@ def lista_zdarzen(
     typ: TypZdarzenia | None = None,
     lokal_id: int | None = None,
     budynek_id: int | None = None,
-    przypisany_uzytkownik_id: int | None = None,
     do_dnia: Annotated[date | None, Query(description="Tylko zdarzenia do tej daty")] = None,
 ) -> Strona[ZdarzenieWyjscie]:
     """Zdarzenia pogrupowane wedlug pilnosci (koncepcja, sekcja 7.3).
@@ -105,8 +116,6 @@ def lista_zdarzen(
         warunki.append(Zdarzenie.typ == typ)
     if lokal_id is not None:
         warunki.append(Zdarzenie.lokal_id == lokal_id)
-    if przypisany_uzytkownik_id is not None:
-        warunki.append(Zdarzenie.przypisany_uzytkownik_id == przypisany_uzytkownik_id)
     if do_dnia is not None:
         warunki.append(Zdarzenie.data_zdarzenia <= do_dnia)
 
@@ -134,7 +143,7 @@ def lista_zdarzen(
     ).all()
 
     return Strona(
-        pozycje=[ZdarzenieWyjscie.model_validate(z) for z in pozycje],
+        pozycje=[na_wyjscie(z) for z in pozycje],
         wszystkich=wszystkich,
         limit=limit,
         offset=offset,
@@ -156,21 +165,20 @@ def _zdarzenie(sesja: SesjaBazy, zdarzenie_id: int) -> Zdarzenie:
     summary="Oznacza zdarzenie jako obsłużone",
 )
 def oznacz_obsluzone(
-    zdarzenie_id: int, dane: ObslugaZdarzenia, sesja: SesjaBazy, kto: Operator
+    zdarzenie_id: int, dane: ObslugaZdarzenia, sesja: SesjaBazy
 ) -> ZdarzenieWyjscie:
     zdarzenie = _zdarzenie(sesja, zdarzenie_id)
     sprawdz_przejscie(PRZEJSCIA_ZDARZENIA, zdarzenie.status, StatusZdarzenia.OBSLUZONE)
 
     zdarzenie.status = StatusZdarzenia.OBSLUZONE
     zdarzenie.obsluzone_dnia = datetime.now(UTC)
-    zdarzenie.obsluzyl_uzytkownik_id = kto.uzytkownik.id
     zdarzenie.odroczone_do = None
     if dane.notatka is not None:
         zdarzenie.notatka = dane.notatka
 
-    zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA, uzytkownik_id=kto.uzytkownik.id)
+    zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA)
     sesja.commit()
-    return ZdarzenieWyjscie.model_validate(zdarzenie)
+    return na_wyjscie(zdarzenie)
 
 
 @router.post(
@@ -178,9 +186,7 @@ def oznacz_obsluzone(
     response_model=ZdarzenieWyjscie,
     summary="Odracza zdarzenie z notatką",
 )
-def odrocz(
-    zdarzenie_id: int, dane: OdroczenieZdarzenia, sesja: SesjaBazy, kto: Operator
-) -> ZdarzenieWyjscie:
+def odrocz(zdarzenie_id: int, dane: OdroczenieZdarzenia, sesja: SesjaBazy) -> ZdarzenieWyjscie:
     zdarzenie = _zdarzenie(sesja, zdarzenie_id)
     sprawdz_przejscie(PRZEJSCIA_ZDARZENIA, zdarzenie.status, StatusZdarzenia.ODROCZONE)
 
@@ -195,27 +201,6 @@ def odrocz(
     if dane.notatka is not None:
         zdarzenie.notatka = dane.notatka
 
-    zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA, uzytkownik_id=kto.uzytkownik.id)
+    zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA)
     sesja.commit()
-    return ZdarzenieWyjscie.model_validate(zdarzenie)
-
-
-@router.post(
-    "/{zdarzenie_id}/przypisanie",
-    response_model=ZdarzenieWyjscie,
-    summary="Przypisuje zdarzenie do osoby",
-)
-def przypisz(
-    zdarzenie_id: int, dane: PrzypisanieZdarzenia, sesja: SesjaBazy, kto: Operator
-) -> ZdarzenieWyjscie:
-    zdarzenie = _zdarzenie(sesja, zdarzenie_id)
-
-    if dane.uzytkownik_id is not None and sesja.get(Uzytkownik, dane.uzytkownik_id) is None:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, "Wskazany użytkownik nie istnieje."
-        )
-
-    zdarzenie.przypisany_uzytkownik_id = dane.uzytkownik_id
-    zapisz_zmiane(sesja, zdarzenie, operacja=OperacjaAudytu.ZMIANA, uzytkownik_id=kto.uzytkownik.id)
-    sesja.commit()
-    return ZdarzenieWyjscie.model_validate(zdarzenie)
+    return na_wyjscie(zdarzenie)

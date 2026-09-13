@@ -6,7 +6,6 @@ dane w bazie. Sesja testowa dziala na zagniezdzonym punkcie zapisu, wiec
 """
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,15 +13,10 @@ from sqlalchemy import Connection, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from najem.auth.haslo import zahaszuj
-from najem.auth.sesje import NAZWA_CIASTECZKA, zaloguj
 from najem.baza import sesja as zaleznosc_sesji
 from najem.baza import silnik
-from najem.domena.slowniki import RolaUzytkownika
 from najem.main import app
-from najem.modele import Budynek, Lokal, Najemca, Uzytkownik
-
-HASLO = "TestoweHaslo123"
+from najem.modele import Budynek, Lokal, Najemca
 
 
 @pytest.fixture(scope="session")
@@ -55,52 +49,12 @@ def baza(polaczenie_api: Connection) -> Iterator[Session]:
 
 @pytest.fixture
 def klient(baza: Session) -> Iterator[TestClient]:
-    """Klient bez zalogowanego uzytkownika."""
+    """Klient HTTP. Aplikacja nie ma juz logowania (ADR 009)."""
     app.dependency_overrides[zaleznosc_sesji] = lambda: baza
     # TestClient bez kontekstu `with` nie uruchamia cyklu zycia aplikacji.
-    # Nie chcemy przy kazdym tescie startowac harmonogramu ani zakladac
-    # konta poczatkowego - to zachowanie ma wlasne testy.
+    # Nie chcemy przy kazdym tescie startowac harmonogramu.
     yield TestClient(app)
     app.dependency_overrides.clear()
-
-
-def _uzytkownik(baza: Session, rola: RolaUzytkownika) -> Uzytkownik:
-    u = Uzytkownik(
-        login=f"test_{rola.value}",
-        imie_nazwisko=f"Testowy {rola.value}",
-        rola=rola,
-        hash_hasla=zahaszuj(HASLO),
-        wymaga_zmiany_hasla=False,
-    )
-    baza.add(u)
-    baza.flush()
-    return u
-
-
-def zaloguj_jako(klient: TestClient, baza: Session, rola: RolaUzytkownika) -> Uzytkownik:
-    """Zaklada konto o podanej roli i ustawia ciasteczko sesyjne w kliencie."""
-    uzytkownik = _uzytkownik(baza, rola)
-    _, token = zaloguj(baza, login=uzytkownik.login, haslo=HASLO, teraz=datetime.now(UTC))
-    klient.cookies.set(NAZWA_CIASTECZKA, token)
-    return uzytkownik
-
-
-@pytest.fixture
-def klient_podglad(klient: TestClient, baza: Session) -> TestClient:
-    zaloguj_jako(klient, baza, RolaUzytkownika.PODGLAD)
-    return klient
-
-
-@pytest.fixture
-def klient_zarzadca(klient: TestClient, baza: Session) -> TestClient:
-    zaloguj_jako(klient, baza, RolaUzytkownika.ZARZADCA)
-    return klient
-
-
-@pytest.fixture
-def klient_admin(klient: TestClient, baza: Session) -> TestClient:
-    zaloguj_jako(klient, baza, RolaUzytkownika.ADMINISTRATOR)
-    return klient
 
 
 @pytest.fixture

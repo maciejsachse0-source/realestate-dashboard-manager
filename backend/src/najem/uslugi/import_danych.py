@@ -84,9 +84,7 @@ class ImportPrzerwany(Exception):
         super().__init__(f"Arkusz ma {len(bledy)} błędów. Nie zapisano niczego.")
 
 
-def _znajdz_lub_dodaj_budynek(
-    sesja: Session, nazwa: str, wynik: WynikImportu, uzytkownik_id: int
-) -> Budynek:
+def _znajdz_lub_dodaj_budynek(sesja: Session, nazwa: str, wynik: WynikImportu) -> Budynek:
     istniejacy = sesja.scalars(
         select(Budynek).where(
             func.lower(Budynek.nazwa) == nazwa.lower(),
@@ -99,13 +97,13 @@ def _znajdz_lub_dodaj_budynek(
     budynek = Budynek(nazwa=nazwa)
     sesja.add(budynek)
     sesja.flush()
-    zapisz_zmiane(sesja, budynek, operacja=OperacjaAudytu.UTWORZENIE, uzytkownik_id=uzytkownik_id)
+    zapisz_zmiane(sesja, budynek, operacja=OperacjaAudytu.UTWORZENIE)
     wynik.budynkow_dodanych += 1
     return budynek
 
 
 def _znajdz_lub_dodaj_najemce(
-    sesja: Session, wiersz: WierszImportu, wynik: WynikImportu, uzytkownik_id: int
+    sesja: Session, wiersz: WierszImportu, wynik: WynikImportu
 ) -> Najemca:
     """Najemca odnajdywany po NIP, a gdy go nie ma — po nazwie.
 
@@ -131,7 +129,7 @@ def _znajdz_lub_dodaj_najemce(
     najemca = Najemca(nazwa_pelna=wiersz.najemca, nip=wiersz.nip)
     sesja.add(najemca)
     sesja.flush()
-    zapisz_zmiane(sesja, najemca, operacja=OperacjaAudytu.UTWORZENIE, uzytkownik_id=uzytkownik_id)
+    zapisz_zmiane(sesja, najemca, operacja=OperacjaAudytu.UTWORZENIE)
     wynik.najemcow_dodanych += 1
     return najemca
 
@@ -141,7 +139,6 @@ def _znajdz_lub_dodaj_lokal(
     budynek: Budynek,
     wiersz: WierszImportu,
     wynik: WynikImportu,
-    uzytkownik_id: int,
 ) -> Lokal:
     istniejacy = sesja.scalars(
         select(Lokal).where(
@@ -162,17 +159,15 @@ def _znajdz_lub_dodaj_lokal(
     )
     sesja.add(lokal)
     sesja.flush()
-    zapisz_zmiane(sesja, lokal, operacja=OperacjaAudytu.UTWORZENIE, uzytkownik_id=uzytkownik_id)
+    zapisz_zmiane(sesja, lokal, operacja=OperacjaAudytu.UTWORZENIE)
     wynik.lokali_dodanych += 1
     return lokal
 
 
-def _zaimportuj_wiersz(
-    sesja: Session, wiersz: WierszImportu, wynik: WynikImportu, uzytkownik_id: int
-) -> None:
-    budynek = _znajdz_lub_dodaj_budynek(sesja, wiersz.budynek, wynik, uzytkownik_id)
-    najemca = _znajdz_lub_dodaj_najemce(sesja, wiersz, wynik, uzytkownik_id)
-    lokal = _znajdz_lub_dodaj_lokal(sesja, budynek, wiersz, wynik, uzytkownik_id)
+def _zaimportuj_wiersz(sesja: Session, wiersz: WierszImportu, wynik: WynikImportu) -> None:
+    budynek = _znajdz_lub_dodaj_budynek(sesja, wiersz.budynek, wynik)
+    najemca = _znajdz_lub_dodaj_najemce(sesja, wiersz, wynik)
+    lokal = _znajdz_lub_dodaj_lokal(sesja, budynek, wiersz, wynik)
 
     biezaca = sesja.scalars(
         select(OkresNajmu).where(
@@ -212,7 +207,7 @@ def _zaimportuj_wiersz(
     ).wartosc
     sesja.add(okres)
     sesja.flush()
-    zapisz_zmiane(sesja, okres, operacja=OperacjaAudytu.UTWORZENIE, uzytkownik_id=uzytkownik_id)
+    zapisz_zmiane(sesja, okres, operacja=OperacjaAudytu.UTWORZENIE)
     wynik.umow_dodanych += 1
 
     if wiersz.czynsz is None:
@@ -241,7 +236,6 @@ def _zaimportuj_wiersz(
             wartosc_stawka_vat=wiersz.stawka_vat,
             obowiazuje_od=obowiazuje_od,
             status_weryfikacji=StatusWeryfikacji.ZATWIERDZONA,
-            zatwierdzil_uzytkownik_id=uzytkownik_id,
             zatwierdzono_dnia=datetime.now(UTC),
             uwagi="Wprowadzone importem z arkusza.",
         )
@@ -266,8 +260,6 @@ def zaimportuj(
     sesja: Session,
     wiersze: list[WierszImportu],
     bledy: list[BladWiersza],
-    *,
-    uzytkownik_id: int,
 ) -> WynikImportu:
     """Zapisuje arkusz. Przy jakimkolwiek błędzie nie zapisuje niczego.
 
@@ -279,5 +271,5 @@ def zaimportuj(
 
     wynik = WynikImportu()
     for wiersz in wiersze:
-        _zaimportuj_wiersz(sesja, wiersz, wynik, uzytkownik_id)
+        _zaimportuj_wiersz(sesja, wiersz, wynik)
     return wynik

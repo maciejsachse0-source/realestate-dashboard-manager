@@ -17,6 +17,11 @@ ZAKAZANE_KORZENIE = {
     "requests",
     "httpx",
     "starlette",
+    # Czytniki plikow mieszkaja w dokumenty/tekst_z_pliku.py i podaja do domeny
+    # gotowy tekst. Gdyby pypdf trafil do domena/, wzorcow ekstrakcji nie daloby
+    # sie testowac na napisie -- kazdy test wymagalby zbudowania pliku PDF.
+    "pypdf",
+    "openpyxl",
 }
 ZAKAZANE_MODULY_NAJEM = {"modele", "api", "repozytoria", "baza", "uslugi", "auth"}
 

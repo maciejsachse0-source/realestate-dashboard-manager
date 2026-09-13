@@ -13,9 +13,9 @@ dependencies = [
     "pydantic-settings>=2.6",
     "structlog>=24.4",
     "apscheduler>=3.11",
-    "argon2-cffi>=23.1",
     "python-multipart>=0.0.20",
     "openpyxl>=3.1",
+    "pypdf>=5.1",
 ]
 
 [project.optional-dependencies]

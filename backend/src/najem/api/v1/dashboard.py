@@ -14,7 +14,6 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
-from najem.auth.zaleznosci import Podglad
 from najem.baza import SesjaBazy
 from najem.domena.parametry import WartoscParametru, stan_efektywny
 from najem.domena.reguly.data_zakonczenia import data_zakonczenia
@@ -81,7 +80,6 @@ def _koniec_umowy(okres: OkresNajmu) -> tuple[date | None, str | None]:
 )
 def lista_lokali(
     baza: SesjaBazy,
-    _: Podglad,
     limit: Annotated[int, Query(ge=1, le=LIMIT_MAKSYMALNY)] = LIMIT_DOMYSLNY,
     offset: Annotated[int, Query(ge=0)] = 0,
     budynek_id: int | None = None,
@@ -150,7 +148,12 @@ def lista_lokali(
     zapytanie = zapytanie.where(*warunki)
 
     kolumna = SORTOWANIE[sortuj]
-    zapytanie = zapytanie.order_by(kolumna.desc() if malejaco else kolumna.asc(), Lokal.id)
+    # Drugi klucz to oznaczenie lokalu. Przy sortowaniu budynkami dashboard
+    # rysuje sekcje, wiec wewnatrz budynku lokale musza isc po oznaczeniu,
+    # a nie w kolejnosci zakladania rekordow.
+    zapytanie = zapytanie.order_by(
+        kolumna.desc() if malejaco else kolumna.asc(), Lokal.oznaczenie, Lokal.id
+    )
 
     wszystkich = (
         baza.scalar(
@@ -265,7 +268,6 @@ def _wiersz(lokal: Lokal, dzien: date, zdarzen: int) -> LokalNaLiscie:
 def stan_lokalu(
     lokal_id: int,
     baza: SesjaBazy,
-    _: Podglad,
     na_dzien: Annotated[
         date | None, Query(description="Domyślnie dzisiaj. Pozwala cofnąć się w czasie.")
     ] = None,

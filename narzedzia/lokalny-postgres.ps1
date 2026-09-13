@@ -15,23 +15,35 @@
     stop    zatrzymaj serwer
     status  sprawdz, czy serwer odpowiada
     psql    otworz konsole SQL
+    kopia   zrzuc baze do pliku (pg_dump -F c)
     reset   USUWA wszystkie dane i stawia baze od zera
+
+.PARAMETER Plik
+    Dla polecenia "kopia": gdzie zapisac zrzut. Bez tego trafia do katalogu
+    kopii ze znacznikiem czasu w nazwie.
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('setup', 'start', 'stop', 'status', 'psql', 'reset')]
-    [string]$Polecenie = 'status'
+    [ValidateSet('setup', 'start', 'stop', 'status', 'psql', 'kopia', 'reset')]
+    [string]$Polecenie = 'status',
+
+    [string]$Plik
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+#: Gdzie leza binaria i dane, decyduje sciezki.ps1. W repozytorium wychodzi
+#: z tego tools\pgsql i pgdata, czyli to samo co zawsze; w instalacji
+#: u uzytkownika oba katalogi leza poza katalogiem programu, zeby aktualizacja
+#: nie mogla ich dotknac.
+. (Join-Path $PSScriptRoot 'sciezki.ps1')
+
 $WersjaPg   = '16.11-1'
-$KatalogRepo = Split-Path -Parent $PSScriptRoot
-$KatalogNarzedzi = Join-Path $KatalogRepo 'tools'
+$KatalogNarzedzi = Katalog-Silnika
 $KatalogPg  = Join-Path $KatalogNarzedzi 'pgsql'
 $BinPg      = Join-Path $KatalogPg 'bin'
-$KatalogDanych = Join-Path $KatalogRepo 'pgdata'
+$KatalogDanych = Katalog-Bazy
 $PlikLogu   = Join-Path $KatalogDanych 'serwer.log'
 $PlikBledow = Join-Path $KatalogDanych 'serwer-bledy.log'
 
@@ -42,8 +54,6 @@ $Baza  = 'najem'
 #: Osobna baza dla testow. Testy nigdy nie dotykaja bazy z prawdziwymi umowami.
 $BazaTestowa = 'najem_testy'
 $HasloSuper = 'postgres-lokalnie'
-
-function Pisz($tekst, $kolor = 'Gray') { Write-Host $tekst -ForegroundColor $kolor }
 
 function Sprawdz-Binaria {
     if (-not (Test-Path (Join-Path $BinPg 'pg_ctl.exe'))) {
@@ -82,7 +92,18 @@ function Zaloz-Baze {
     }
     New-Item -ItemType Directory -Force -Path $KatalogDanych | Out-Null
 
-    $plikHasla = Join-Path $env:TEMP "najem-pg-haslo-$PID.txt"
+    # Plik z haslem obok katalogu danych, nie w $env:TEMP. TEMP bywa sciezka
+    # w formacie 8.3 ("C:\Users\HPOMEN~1\..."), a Remove-Item -LiteralPath
+    # wywala sie wtedy na "An object at the specified path C:\Users\HPOMEN~1
+    # does not exist" -- mimo -ErrorAction SilentlyContinue, bo to wyjatek
+    # walidacji argumentu, a nie blad cmdletu.
+    #
+    # Pulapka byla niewidoczna w rozwoju: ta galaz wykonuje sie WYLACZNIE przy
+    # pierwszym zakladaniu bazy, wiec u autora nigdy, a u uzytkownika za kazdym
+    # pierwszym uruchomieniem. Znalazla ja dopiero proba generalna instalacji.
+    $katalogHasla = Split-Path -Parent $KatalogDanych
+    New-Item -ItemType Directory -Force -Path $katalogHasla | Out-Null
+    $plikHasla = Join-Path $katalogHasla "najem-pg-haslo-$PID.txt"
     Set-Content -LiteralPath $plikHasla -Value $HasloSuper -NoNewline -Encoding ascii
     try {
         # Provider ICU z locale pl-PL: poprawne sortowanie polskich znakow
@@ -163,9 +184,58 @@ function Zaloz-Role {
     Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 }
 
+function Czyj-Serwer {
+    <#
+        Zwraca katalog danych serwera, ktory odpowiada na naszym porcie,
+        albo $null, gdy nie da sie tego ustalic.
+
+        Czy-Dziala sprawdza tylko, czy COS odpowiada na 5434 -- nie czy to
+        nasz serwer. Przy dwoch instalacjach na jednym komputerze druga cicho
+        podlacza sie do bazy pierwszej i puszcza na niej migracje. Zdarzylo
+        sie to naprawde, przy probie generalnej instalacji.
+    #>
+    $psql = Join-Path $BinPg 'psql.exe'
+    if (-not (Test-Path -LiteralPath $psql)) { return $null }
+    $env:PGPASSWORD = $HasloSuper
+    try {
+        $katalog = & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -tAc 'SHOW data_directory' 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($katalog)) { return $null }
+        return $katalog.Trim()
+    }
+    catch { return $null }
+    finally { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
+}
+
+function Sprawdz-Czy-Nasz {
+    <# Wyklada sie glosno, gdy na porcie stoi cudzy serwer. #>
+    $czyj = Czyj-Serwer
+    if (-not $czyj) {
+        throw @"
+Na porcie $Port odpowiada serwer, z ktorym nie umiem sie polaczyc.
+To nie jest baza tej instalacji. Zatrzymaj tamten serwer i sprobuj ponownie.
+"@
+    }
+    # Postgres podaje sciezke z ukosnikami w druga strone niz Windows.
+    $nasz = (Resolve-Path -LiteralPath $KatalogDanych).Path.Replace('\', '/').TrimEnd('/')
+    $jego = $czyj.Replace('\', '/').TrimEnd('/')
+    if ($nasz -ne $jego) {
+        throw @"
+Na porcie $Port dziala JUZ INNA baza tego programu:
+    ta instalacja : $nasz
+    na porcie     : $jego
+Nie ruszam jej, bo migracje poszlyby na cudze dane. Zatrzymaj tamten
+program (Zatrzymaj system.cmd w jego katalogu) i sprobuj ponownie.
+"@
+    }
+}
+
 function Start-Serwer {
     Sprawdz-Binaria
-    if (Czy-Dziala) { Pisz "Baza juz dziala na porcie $Port." 'DarkGray'; return }
+    if (Czy-Dziala) {
+        if (Test-Path -LiteralPath (Join-Path $KatalogDanych 'PG_VERSION')) { Sprawdz-Czy-Nasz }
+        Pisz "Baza juz dziala na porcie $Port." 'DarkGray'
+        return
+    }
 
     New-Item -ItemType Directory -Force -Path $KatalogDanych | Out-Null
 
@@ -186,6 +256,38 @@ function Start-Serwer {
 
     Pisz "Baza nie wstala w 30 sekund. Zajrzyj do: $PlikBledow" 'Red'
     throw 'Nie udalo sie uruchomic bazy danych.'
+}
+
+function Zrzuc-Baze {
+    <#
+        Zrzut w formacie wlasnym pg_dump (-F c): kompresuje sie sam i daje
+        sie czytac przez pg_restore --list bez odtwarzania czegokolwiek.
+        Haslo i port zna ten skrypt, dlatego zrzut mieszka tutaj, a nie
+        w aktualizatorze -- inaczej te same dane trzeba byloby powtorzyc.
+    #>
+    param([string]$Cel)
+
+    Sprawdz-Binaria
+    if (-not (Czy-Dziala)) { throw 'Baza nie dziala, nie ma czego zrzucic.' }
+
+    if ([string]::IsNullOrWhiteSpace($Cel)) {
+        $katalog = Katalog-Kopii
+        New-Item -ItemType Directory -Force -Path $katalog | Out-Null
+        $Cel = Join-Path $katalog ("najem-$(Get-Date -Format 'yyyy-MM-dd-HHmm').dump")
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Cel) | Out-Null
+
+    $env:PGPASSWORD = $Haslo
+    try {
+        & (Join-Path $BinPg 'pg_dump.exe') -h 127.0.0.1 -p $Port -U $Rola -d $Baza `
+            --format=custom --file="$Cel"
+        if ($LASTEXITCODE -ne 0) { throw "pg_dump zakonczyl sie bledem $LASTEXITCODE" }
+    }
+    finally { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
+
+    $mb = [math]::Round((Get-Item -LiteralPath $Cel).Length / 1MB, 1)
+    Pisz "Zrzut bazy: $Cel ($mb MB)" 'Green'
+    return $Cel
 }
 
 function Stop-Serwer {
@@ -215,6 +317,7 @@ switch ($Polecenie) {
         $env:PGPASSWORD = $Haslo
         & (Join-Path $BinPg 'psql.exe') -h 127.0.0.1 -p $Port -U $Rola -d $Baza
     }
+    'kopia' { Zrzuc-Baze -Cel $Plik | Out-Null }
     'reset' {
         Pisz 'To usunie WSZYSTKIE dane z lokalnej bazy.' 'Yellow'
         $odp = Read-Host 'Wpisz TAK, zeby potwierdzic'

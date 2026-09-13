@@ -1,7 +1,10 @@
 """Zapis do logu audytu.
 
-Kazda zmiana danych zostawia slad: kto, kiedy, co, z jakiej wartosci na jaka.
-Bez wyjatkow, takze dla zmian recznych (koncepcja, sekcja 8.1 punkt 6).
+Kazda zmiana danych zostawia slad: kiedy, co, z jakiej wartosci na jaka.
+Bez wyjatkow, takze dla zmian recznych.
+
+Kolumny "kto" tu nie ma: logowanie zostalo usuniete z systemu, wiec nie ma
+czego zapisac. Odstepstwo od sekcji 8.1 punkt 6 koncepcji, ADR 009.
 
 Tabela `log_audytu` jest chroniona wyzwalaczem przed UPDATE i DELETE, wiec
 zapis jest jednokierunkowy takze dla nas.
@@ -20,14 +23,6 @@ from najem.modele import LogAudytu
 #: Pola techniczne, ktorych zmiany nie zapisujemy: to szum, nie informacja.
 POLA_POMIJANE: frozenset[str] = frozenset({"utworzono", "zmodyfikowano", "wersja"})
 
-#: Pola, ktorych FAKT zmiany zapisujemy, ale WARTOSCI nigdy.
-#: Skrot hasla w logu audytu to ten sam sekret w drugiej tabeli, czytanej przez
-#: szerszy krag osob. Log ma odpowiadac na pytanie "kto i kiedy", a nie "co dokladnie".
-POLA_UTAJNIONE: frozenset[str] = frozenset({"hash_hasla", "token_hash"})
-
-#: Znacznik wstawiany zamiast utajnionej wartosci.
-UTAJNIONE = "[utajnione]"
-
 
 class MaIdentyfikator(Protocol):
     id: int
@@ -44,7 +39,6 @@ def zapisz_zmiane(
     obiekt: object,
     *,
     operacja: OperacjaAudytu,
-    uzytkownik_id: int | None,
     id_zadania: str | None = None,
     adres_ip: str | None = None,
     pola: Iterable[str] | None = None,
@@ -61,7 +55,6 @@ def zapisz_zmiane(
     if operacja is OperacjaAudytu.UTWORZENIE:
         sesja.add(
             LogAudytu(
-                uzytkownik_id=uzytkownik_id,
                 operacja=operacja,
                 tabela=tabela,
                 rekord_id=rekord_id,
@@ -93,16 +86,10 @@ def zapisz_zmiane(
         if stara == nowa:
             continue
 
-        wartosc_stara: str | None
-        wartosc_nowa: str | None
-        if nazwa in POLA_UTAJNIONE:
-            wartosc_stara, wartosc_nowa = UTAJNIONE, UTAJNIONE
-        else:
-            wartosc_stara, wartosc_nowa = _na_tekst(stara), _na_tekst(nowa)
+        wartosc_stara, wartosc_nowa = _na_tekst(stara), _na_tekst(nowa)
 
         sesja.add(
             LogAudytu(
-                uzytkownik_id=uzytkownik_id,
                 operacja=operacja,
                 tabela=tabela,
                 rekord_id=rekord_id,
@@ -123,7 +110,6 @@ def zapisz_odczyt_wrazliwy(
     *,
     tabela: str,
     rekord_id: int | None,
-    uzytkownik_id: int | None,
     id_zadania: str | None = None,
     adres_ip: str | None = None,
 ) -> None:
@@ -133,7 +119,6 @@ def zapisz_odczyt_wrazliwy(
     """
     sesja.add(
         LogAudytu(
-            uzytkownik_id=uzytkownik_id,
             operacja=OperacjaAudytu.ODCZYT_WRAZLIWY,
             tabela=tabela,
             rekord_id=rekord_id,

@@ -7,19 +7,25 @@ i ślad w `parametr_wartosc`.
 
 from datetime import UTC, date, datetime
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import ColumnElement, select
 
-from najem.auth.zaleznosci import Operator, Podglad, Zarzadca
 from najem.baza import SesjaBazy
 from najem.config import ustawienia
 from najem.dokumenty.przechowalnia import BladPliku, przyjmij_plik, wczytaj_plik
-from najem.domena.slowniki import OperacjaAudytu, StatusPrzetworzenia, TypDokumentu
+from najem.domena.slowniki import (
+    OperacjaAudytu,
+    StatusPrzetworzenia,
+    TrybPrzechowywania,
+    TypDokumentu,
+)
 from najem.modele import Dokument, OkresNajmu
 from najem.uslugi.audyt import zapisz_odczyt_wrazliwy, zapisz_zmiane
+from najem.uslugi.ustawienia_systemu import katalog_skanu
 
 router = APIRouter(prefix="/dokumenty", tags=["dokumenty"])
 
@@ -37,9 +43,10 @@ class DokumentWyjscie(BaseModel):
     hash_sha256: str | None
     rozmiar_bajty: int | None
     typ_mime: str | None
+    #: Kopia w przechowalni systemu czy odnosnik do pliku na dysku.
+    przechowywanie: TrybPrzechowywania
     dokument_nadrzedny_id: int | None
     status_przetworzenia: StatusPrzetworzenia
-    wgral_uzytkownik_id: int | None
     utworzono: datetime
     uwagi: str | None
     wersja: int
@@ -66,7 +73,6 @@ def _adres(request: Request) -> str | None:
 )
 async def wgraj(
     baza: SesjaBazy,
-    kto: Operator,
     request: Request,
     plik: Annotated[UploadFile, File(description="PDF, DOCX, JPEG albo PNG")],
     typ: Annotated[TypDokumentu, Query(description="Rodzaj dokumentu")],
@@ -129,7 +135,6 @@ async def wgraj(
         typ_mime=zapisany.typ.value,
         dokument_nadrzedny_id=dokument_nadrzedny_id,
         status_przetworzenia=StatusPrzetworzenia.WGRANY,
-        wgral_uzytkownik_id=kto.uzytkownik.id,
     )
     baza.add(dokument)
     baza.flush()
@@ -137,7 +142,6 @@ async def wgraj(
         baza,
         dokument,
         operacja=OperacjaAudytu.UTWORZENIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -147,7 +151,6 @@ async def wgraj(
 @router.get("", response_model=list[DokumentWyjscie], summary="Dokumenty umowy albo lokalu")
 def lista(
     baza: SesjaBazy,
-    _: Podglad,
     okres_najmu_id: Annotated[int | None, Query()] = None,
 ) -> list[DokumentWyjscie]:
     warunki: list[ColumnElement[bool]] = [Dokument.usunieto_dnia.is_(None)]
@@ -165,7 +168,7 @@ def lista(
     summary="Pobiera plik dokumentu",
     response_class=Response,
 )
-def pobierz(dokument_id: int, baza: SesjaBazy, kto: Podglad, request: Request) -> Response:
+def pobierz(dokument_id: int, baza: SesjaBazy, request: Request) -> Response:
     """Pobranie zostawia ślad w audycie (koncepcja, sekcja 8.1 punkt 6).
 
     Plik idzie z nagłówkiem `inline`, żeby przeglądarka mogła go pokazać
@@ -179,8 +182,28 @@ def pobierz(dokument_id: int, baza: SesjaBazy, kto: Podglad, request: Request) -
     if dokument.plik_sciezka is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ten dokument nie ma wgranego pliku.")
 
+    # Dokument wgrany przez przeglądarkę leży w przechowalni systemu.
+    # Dokument wczytany z dysku został tam, gdzie leżał — ścieżka jest wtedy
+    # względna wobec katalogu skanowanego, a nie wobec przechowalni.
+    if dokument.przechowywanie == TrybPrzechowywania.LINK:
+        katalog = katalog_skanu(baza)
+        if katalog is None:
+            raise HTTPException(
+                status.HTTP_410_GONE,
+                "Ten dokument jest odnośnikiem do pliku na dysku, a katalog "
+                "z dokumentami nie jest ustawiony. Wskaż go na ekranie "
+                "Dokumenty z dysku.",
+            )
+        brak = (
+            "Pliku nie ma pod zapisaną ścieżką. Został przeniesiony, przemianowany "
+            "albo usunięty. Sprawdź to przeglądem odnośników."
+        )
+    else:
+        katalog = ustawienia().katalog_dokumentow
+        brak = "Pliku nie ma w przechowalni. Mógł zostać usunięty ręcznie."
+
     try:
-        zawartosc = wczytaj_plik(dokument.plik_sciezka, katalog=ustawienia().katalog_dokumentow)
+        zawartosc = wczytaj_plik(dokument.plik_sciezka, katalog=katalog, brak=brak)
     except BladPliku as blad:
         raise HTTPException(status.HTTP_410_GONE, str(blad)) from blad
 
@@ -188,7 +211,6 @@ def pobierz(dokument_id: int, baza: SesjaBazy, kto: Podglad, request: Request) -
         baza,
         tabela="dokument",
         rekord_id=dokument.id,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
@@ -199,7 +221,11 @@ def pobierz(dokument_id: int, baza: SesjaBazy, kto: Podglad, request: Request) -
         media_type=dokument.typ_mime or "application/octet-stream",
         headers={
             # filename* z kodowaniem UTF-8: nazwy plików bywają po polsku.
-            "Content-Disposition": f"inline; filename*=UTF-8''{nazwa}",
+            # Wartość musi być zakodowana procentowo (RFC 5987). Nagłówki HTTP
+            # są latin-1, więc wstawiona wprost „ł" nie przechodzi przez
+            # kodowanie odpowiedzi i pobranie kończy się błędem kodeka zamiast
+            # plikiem. Dotyczyło to większości dokumentów w archiwum.
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(nazwa)}",
             "X-Content-Type-Options": "nosniff",
         },
     )
@@ -210,7 +236,7 @@ def pobierz(dokument_id: int, baza: SesjaBazy, kto: Podglad, request: Request) -
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Usuwa dokument (miękko)",
 )
-def usun(dokument_id: int, baza: SesjaBazy, kto: Zarzadca, request: Request) -> None:
+def usun(dokument_id: int, baza: SesjaBazy, request: Request) -> None:
     """Sam plik zostaje w przechowalni. W systemie, który ma rozstrzygać spory,
     skasowanie dowodu jest problemem prawnym, nie technicznym.
     """
@@ -221,12 +247,10 @@ def usun(dokument_id: int, baza: SesjaBazy, kto: Zarzadca, request: Request) -> 
         )
 
     dokument.usunieto_dnia = datetime.now(UTC)
-    dokument.usunal_uzytkownik_id = kto.uzytkownik.id
     zapisz_zmiane(
         baza,
         dokument,
         operacja=OperacjaAudytu.USUNIECIE,
-        uzytkownik_id=kto.uzytkownik.id,
         adres_ip=_adres(request),
     )
     baza.commit()
